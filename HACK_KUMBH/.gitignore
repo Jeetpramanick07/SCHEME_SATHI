@@ -1,0 +1,164 @@
+# ==============================================================================
+# SchemeSaathi / Hack Kumbh - Root Git Ignore Rules
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secrets (CRITICAL)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cert
+*.crt
+# Never ignore example env files
+!.env.example
+!**/.env.example
+
+# ------------------------------------------------------------------------------
+# 2. Node & JavaScript / TypeScript Dependencies
+# ------------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------------------------------------------
+# 3. Build & Compiler Outputs
+# ------------------------------------------------------------------------------
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+*.tsbuildinfo
+.vitest/
+**/.vitest/
+coverage/
+**/coverage/
+.nyc_output/
+
+# ------------------------------------------------------------------------------
+# 4. Databases, Local Persistent Data & Locks
+# ------------------------------------------------------------------------------
+.db_data/
+**/.db_data/
+*.sqlite
+*.sqlite3
+*.db
+*.pid
+*.seed
+*.out
+*.lock
+!pnpm-lock.yaml
+!package-lock.json
+!yarn.lock
+
+# ------------------------------------------------------------------------------
+# 5. Python Artifacts & Virtual Environments
+# ------------------------------------------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+**/.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Virtual Environments
+venv/
+**/venv/
+.venv/
+**/.venv/
+env/
+**/env/
+ENV/
+env.bak/
+venv.bak/
+
+# ------------------------------------------------------------------------------
+# 6. Audio Cache & Large Media Binaries
+# ------------------------------------------------------------------------------
+# Audio cache WAV files are generated assets (~44MB)
+audio_cache/*.wav
+**/audio_cache/*.wav
+*.wav
+*.mp3
+# Always preserve audio manifest and gitkeep
+!audio_manifest.json
+!**/audio_manifest.json
+!.gitkeep
+!**/.gitkeep
+
+# ------------------------------------------------------------------------------
+# 7. Archives, Backups & Compressed Packages
+# ------------------------------------------------------------------------------
+*.zip
+*.tar
+*.gz
+*.tgz
+*.rar
+*.7z
+*.bak
+*.swp
+*.swo
+*~
+
+# ------------------------------------------------------------------------------
+# 8. Operating System & File System Artifacts
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------------------------------------------
+# 9. IDEs & Editors
+# ------------------------------------------------------------------------------
+.idea/
+**/.idea/
+.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
+*.sublime-workspace
+*.sublime-project
+*.code-workspace

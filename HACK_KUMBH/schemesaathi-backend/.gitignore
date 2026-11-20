@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+
+# Databases and local storage
+.db_data/
+*.sqlite
+*.db
+*.pid
+*.out
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# Logs and coverage
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.vitest/
+
+# Audio cache
+audio_cache/
+**/audio_cache/
+!**/audio_manifest.json
+!audio_manifest.json
+!.gitkeep
+!**/.gitkeep
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

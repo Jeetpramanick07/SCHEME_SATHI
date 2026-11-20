@@ -1,0 +1,17 @@
+[
+  {
+    "document_id": "DOC_002",
+    "requires_document_ids": ["DOC_001", "DOC_004"],
+    "note": "Unverified sample prerequisite: Income certificate requires Aadhaar and Ration card"
+  },
+  {
+    "document_id": "DOC_003",
+    "requires_document_ids": ["DOC_001"],
+    "note": "Unverified sample prerequisite: Domicile certificate requires Aadhaar"
+  },
+  {
+    "document_id": "DOC_005",
+    "requires_document_ids": ["DOC_001", "DOC_003"],
+    "note": "Unverified sample prerequisite: Caste certificate requires Aadhaar and Domicile"
+  }
+]
