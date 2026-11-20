@@ -119,6 +119,8 @@ export interface SchemeCompiledRules {
     district_ids?: string[];
     area_type?: string;
     nmc_only?: boolean;
+    excluded_talukas?: string[];
+    included_talukas?: string[];
   };
 }
 
@@ -140,6 +142,8 @@ export const SchemeCompiledRulesSchema = z.object({
     district_ids: z.array(z.string()).optional(),
     area_type: z.string().optional(),
     nmc_only: z.boolean().optional(),
+    excluded_talukas: z.array(z.string()).optional(),
+    included_talukas: z.array(z.string()).optional(),
   }),
 });
 
@@ -171,6 +175,8 @@ export interface EvaluationContext {
   members?: EvaluationSubject[];
   approved_parent_benefits?: string[]; // IDs of approved parent schemes
   attribute_parent_mappings?: Record<string, string>; // Data-driven: attribute_key -> required_parent_scheme_id
+  district_name_by_id?: Record<string, string>;
+  attribute_labels?: Record<string, { en: string; hi: string; mr: string }>;
   language?: "en" | "hi" | "mr";
 }
 
