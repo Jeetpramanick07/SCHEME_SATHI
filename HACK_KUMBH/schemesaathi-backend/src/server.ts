@@ -103,6 +103,14 @@ export async function buildServer(): Promise<FastifyInstance> {
     });
   });
 
+  // Root redirect / health greeting
+  server.get("/", async (_req, reply) => {
+    return reply.redirect("/docs");
+  });
+  server.head("/", async (_req, reply) => {
+    return reply.status(200).send();
+  });
+
   // GET /health
   server.get("/health", async () => {
     let schemeCount = 0;
