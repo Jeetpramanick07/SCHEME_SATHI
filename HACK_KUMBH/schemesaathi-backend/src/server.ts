@@ -1,15 +1,16 @@
 import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
-import multipart from "@fastify/multipart";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import {
   serializerCompiler,
   validatorCompiler,
 } from "fastify-type-provider-zod";
+import fastifyMultipart from "@fastify/multipart";
 import { config } from "./config.js";
 import { initDb, closeDb, getDbType, db } from "./db/index.js";
 import * as schema from "./db/schema.js";
+import { eq } from "drizzle-orm";
 import { setupAuth } from "./services/auth.js";
 import { rulesCache } from "./services/cache.js";
 import { catalogueRoutes } from "./modules/catalogue/routes.js";
@@ -17,7 +18,10 @@ import { eligibilityRoutes } from "./modules/eligibility/routes.js";
 import { householdRoutes } from "./modules/households/routes.js";
 import { applicationRoutes } from "./modules/applications/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
-import { voiceRoutes } from "./modules/voice/voice.routes.js";
+import { prefillRoutes } from "./modules/prefill/routes.js";
+import { voiceRoutes } from "./modules/voice/routes.js";
+import { smsRoutes } from "./modules/sms/routes.js";
+import { authRoutes } from "./modules/auth/routes.js";
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -34,13 +38,14 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Plugins
   await server.register(cors, {
-    origin: true,
+    origin: config.corsOrigins,
     credentials: true,
   });
 
-  await server.register(multipart, {
+  await server.register(fastifyMultipart, {
     limits: {
-      fileSize: 15 * 1024 * 1024, // 15MB max file size
+      fileSize: 10 * 1024 * 1024,
+      files: 1,
     },
   });
 
@@ -121,15 +126,88 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Register Feature Modules under /api/v1
   await server.register(
     async (v1) => {
+      // GET /api/v1/meta: dataset version, synthetic flags, counts
+      v1.get("/meta", async () => {
+        let total = 0;
+        let curated = 0;
+        let imported = 0;
+        let verified = 0;
+        let synthetic = 0;
+        let syntheticHouseholds = 0;
+        let syntheticApps = 0;
+
+        try {
+          const rows = await db
+            .select({
+              scheme_id: schema.schemes.scheme_id,
+              source: schema.schemes.source,
+              verified: schema.schemes.verified,
+              is_test: schema.schemes.is_test,
+              status: schema.schemes.status,
+            })
+            .from(schema.schemes);
+
+          total = rows.length;
+          for (const r of rows) {
+            if (r.is_test) synthetic++;
+            if (r.source === "curated") curated++;
+            else if (r.source === "imported") imported++;
+            if (r.verified) verified++;
+          }
+
+          const synthHh = await db
+            .select({ id: schema.households.household_id })
+            .from(schema.households)
+            .where(eq(schema.households.is_synthetic, true));
+          syntheticHouseholds = synthHh.length;
+
+          const synthAppRows = await db
+            .select({ id: schema.applications.application_id })
+            .from(schema.applications)
+            .where(eq(schema.applications.is_synthetic, true));
+          syntheticApps = synthAppRows.length;
+        } catch {
+          // Fallback if DB query fails during initialization
+        }
+
+        return {
+          dataset_version: rulesCache.getVersion() || "1.0.0",
+          synthetic_flags: {
+            has_synthetic_schemes: synthetic > 0,
+            synthetic_schemes_count: synthetic,
+            has_synthetic_data: syntheticHouseholds > 0 || syntheticApps > 0 || synthetic > 0,
+            synthetic_households_count: syntheticHouseholds,
+            synthetic_applications_count: syntheticApps,
+          },
+          counts: {
+            total_schemes: total,
+            curated_schemes: curated,
+            imported_schemes: imported,
+            verified_schemes: verified,
+            active_schemes: total - synthetic,
+          },
+          db: getDbType(),
+          cors_origins: config.corsOrigins,
+          timestamp: new Date().toISOString(),
+        };
+      });
+
       await v1.register(catalogueRoutes);
       await v1.register(eligibilityRoutes);
       await v1.register(householdRoutes);
       await v1.register(applicationRoutes);
       await v1.register(adminRoutes);
-      await v1.register(voiceRoutes);
+      await v1.register(prefillRoutes);
+      await v1.register(voiceRoutes, { prefix: "/voice" });
+      await v1.register(smsRoutes);
+      await v1.register(authRoutes);
     },
     { prefix: "/api/v1" }
   );
+
+  // Direct root aliases
+  await server.register(voiceRoutes, { prefix: "/voice" });
+  await server.register(smsRoutes);
 
   return server;
 }

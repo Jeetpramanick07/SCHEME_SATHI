@@ -1,8 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import child_process from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { IndicVoiceClient, type IndicLangCode } from "../client/indicVoiceClient.js";
 import { generateSpokenScript, type SchemeAudioSource } from "./scheme-audio-script.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Creates a valid PCM 16kHz mono WAV header and sinusoidal tone buffer
@@ -34,7 +39,7 @@ export function createFallbackWav(durationSeconds: number, sampleRate = 16000): 
   buffer.write("data", 36);
   buffer.writeUInt32LE(dataSize, 40);
 
-  // Soft sinusoidal acoustic confirmation waveform
+  // Soft sinusoidal acoustic confirmation waveform (tone-only)
   const freq = 440;
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
@@ -47,7 +52,87 @@ export function createFallbackWav(durationSeconds: number, sampleRate = 16000): 
 }
 
 /**
- * Measures real audio duration from standard WAV header (bytes 28-31 byte_rate, bytes 40-43 data_size).
+ * Performs a spectral check on audio PCM samples.
+ * Detects tone-only audio (e.g. artificial sine wave) by measuring spectral peak ratio.
+ * Pure tones have >65% energy concentrated in 1 discrete frequency bin.
+ */
+export function detectToneOnlyAudio(buffer: Buffer): { isToneOnly: boolean; peakRatio: number } {
+  if (buffer.length < 2048) {
+    return { isToneOnly: false, peakRatio: 0 };
+  }
+
+  // Find data offset
+  let dataOffset = 44;
+  for (let i = 12; i < Math.min(buffer.length - 8, 200); i++) {
+    if (buffer.toString("ascii", i, i + 4) === "data") {
+      dataOffset = i + 8;
+      break;
+    }
+  }
+
+  const sampleCount = 1024;
+  const startSample = Math.min(Math.floor((buffer.length - dataOffset) / 4), 2000);
+  const offset = dataOffset + startSample * 2;
+
+  if (offset + sampleCount * 2 > buffer.length) {
+    return { isToneOnly: false, peakRatio: 0 };
+  }
+
+  const samples = new Float64Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = buffer.readInt16LE(offset + i * 2) / 32768.0;
+  }
+
+  // Power spectrum via DFT
+  let maxPower = 0;
+  let totalPower = 0;
+
+  for (let k = 1; k < sampleCount / 2; k++) {
+    let re = 0;
+    let im = 0;
+    const angleStep = (2 * Math.PI * k) / sampleCount;
+    for (let n = 0; n < sampleCount; n++) {
+      const angle = angleStep * n;
+      re += samples[n]! * Math.cos(angle);
+      im -= samples[n]! * Math.sin(angle);
+    }
+    const power = re * re + im * im;
+    totalPower += power;
+    if (power > maxPower) {
+      maxPower = power;
+    }
+  }
+
+  const peakRatio = totalPower > 0 ? maxPower / totalPower : 0;
+  const isToneOnly = peakRatio > 0.65;
+  return { isToneOnly, peakRatio };
+}
+
+/**
+ * Converts WAV PCM buffer into MP3 using ffmpeg if available.
+ */
+export function convertWavToMp3(wavBuffer: Buffer): Buffer {
+  try {
+    const res = child_process.spawnSync("ffmpeg", [
+      "-y",
+      "-i", "pipe:0",
+      "-codec:a", "libmp3lame",
+      "-b:a", "64k",
+      "-f", "mp3",
+      "pipe:1"
+    ], {
+      input: wavBuffer,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    if (res.status === 0 && res.stdout && res.stdout.length > 0) {
+      return res.stdout;
+    }
+  } catch {}
+  return wavBuffer;
+}
+
+/**
+ * Measures real audio duration from standard WAV header.
  */
 export function measureWavDuration(wavBuffer: Buffer): number {
   if (wavBuffer.length < 44) return 0;
@@ -79,6 +164,7 @@ export interface ManifestEntry {
   script: string;
   script_checksum: string;
   size_bytes: number;
+  review_status: "needs_native_review" | "reviewed";
 }
 
 export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}): Promise<ManifestEntry[]> {
@@ -91,7 +177,7 @@ export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}):
     path.resolve(process.cwd(), "data/government_welfare_schemes.json");
 
   const resolvedOutput =
-    options.outputDir || path.resolve(process.cwd(), "tts_stt/audio_cache");
+    options.outputDir || path.resolve(__dirname, "../audio_cache");
 
   if (!fs.existsSync(resolvedOutput)) {
     fs.mkdirSync(resolvedOutput, { recursive: true });
@@ -104,25 +190,17 @@ export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}):
 
   console.log(`[PrecomputeAudio] Processing ${schemes.length} schemes (force=${force}, allowMock=${allowMock})...`);
 
-  // Load existing manifest if present to preserve unchanged files
+  // Load existing manifest if present
   const existingManifestMap = new Map<string, ManifestEntry>();
-  const manifestCandidates = [
-    path.join(resolvedOutput, "audio_manifest.json"),
-    path.resolve(resolvedOutput, "../audio_manifest.json"),
-  ];
+  const manifestPath = path.resolve(__dirname, "../audio_manifest.json");
 
-  for (const mPath of manifestCandidates) {
-    if (fs.existsSync(mPath)) {
-      try {
-        const oldEntries = JSON.parse(fs.readFileSync(mPath, "utf-8")) as ManifestEntry[];
-        for (const entry of oldEntries) {
-          existingManifestMap.set(`${entry.scheme_id}_${entry.lang}`, entry);
-        }
-        break;
-      } catch {
-        // ignore parse error
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const oldEntries = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as ManifestEntry[];
+      for (const entry of oldEntries) {
+        existingManifestMap.set(`${entry.scheme_id}_${entry.lang}`, entry);
       }
-    }
+    } catch {}
   }
 
   const client = new IndicVoiceClient(voiceServiceUrl);
@@ -143,11 +221,11 @@ export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}):
       console.error(`[PrecomputeAudio] FATAL: Voice service is offline at ${voiceServiceUrl} and --allow-mock was not specified.`);
       throw new Error(`Voice service offline: ${err instanceof Error ? err.message : String(err)}`);
     }
-    console.log(`[PrecomputeAudio] Voice service offline at ${voiceServiceUrl}. Running in mock generator mode (--allow-mock enabled).`);
+    console.log(`[PrecomputeAudio] Voice service offline at ${voiceServiceUrl}. Running with --allow-mock enabled.`);
   }
 
   if (serviceIsMock && !allowMock) {
-    console.error(`[PrecomputeAudio] FATAL: Voice service at ${voiceServiceUrl} returned mock mode (X-Mock: true) and --allow-mock was not specified.`);
+    console.error(`[PrecomputeAudio] FATAL: Voice service returned mock mode and --allow-mock was not specified.`);
     throw new Error("Voice service is running in mock mode. Real audio required for production precomputation.");
   }
 
@@ -159,31 +237,30 @@ export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}):
     for (const lang of languages) {
       const scriptInfo = generateSpokenScript(s as unknown as SchemeAudioSource, lang);
       const scriptChecksum = computeScriptChecksum(scriptInfo.spoken_script);
-      const filename = `${schemeId}_${lang}.wav`;
+      const filename = `${schemeId}_${lang}.mp3`;
       const outPath = path.join(resolvedOutput, filename);
 
       const existingEntry = existingManifestMap.get(`${schemeId}_${lang}`);
       const fileExists = fs.existsSync(outPath);
       const scriptUnchanged = existingEntry && existingEntry.script_checksum === scriptChecksum;
 
-      // Skip regeneration if file exists, script checksum matches, and --force is not set
       if (!force && fileExists && scriptUnchanged) {
         const existingBuffer = fs.readFileSync(outPath);
-        const realDuration = measureWavDuration(existingBuffer) || existingEntry.duration_seconds;
         manifest.push({
           scheme_id: schemeId,
           lang,
           filename,
-          duration_seconds: realDuration,
+          duration_seconds: existingEntry.duration_seconds,
           script: scriptInfo.spoken_script,
           script_checksum: scriptChecksum,
           size_bytes: existingBuffer.length,
+          review_status: "needs_native_review",
         });
-        console.log(`  ↷ Skipped (unchanged): ${filename} (${realDuration}s)`);
+        console.log(`  ↷ Skipped (unchanged): ${filename}`);
         continue;
       }
 
-      // Generation required
+      // Synthesize audio
       let wavBuffer: Buffer;
       if (isServiceOnline) {
         const synthesized = await client.synthesizeSpeechWithMeta(scriptInfo.spoken_script, lang, { slow: true });
@@ -198,38 +275,57 @@ export async function precomputeAllSchemeAudio(options: PrecomputeOptions = {}):
         wavBuffer = createFallbackWav(scriptInfo.estimated_duration_seconds);
       }
 
-      const realDuration = measureWavDuration(wavBuffer) || scriptInfo.estimated_duration_seconds;
-      fs.writeFileSync(outPath, wavBuffer);
+      // Spectral tone check: Detect artificial sine tone
+      const toneCheck = detectToneOnlyAudio(wavBuffer);
+      if (toneCheck.isToneOnly && !allowMock) {
+        throw new Error(
+          `[PrecomputeAudio] Tone-only audio detected via spectral check (peak ratio ${toneCheck.peakRatio.toFixed(3)}). Real neural audio required unless --allow-mock is specified.`
+        );
+      }
+
+      // Convert WAV to MP3
+      const audioOutputBuffer = convertWavToMp3(wavBuffer);
+      fs.writeFileSync(outPath, audioOutputBuffer);
+
+      const duration = measureWavDuration(wavBuffer) || scriptInfo.estimated_duration_seconds;
 
       manifest.push({
         scheme_id: schemeId,
         lang,
         filename,
-        duration_seconds: realDuration,
+        duration_seconds: duration,
         script: scriptInfo.spoken_script,
         script_checksum: scriptChecksum,
-        size_bytes: wavBuffer.length,
+        size_bytes: audioOutputBuffer.length,
+        review_status: "needs_native_review",
       });
 
-      console.log(`  ✓ Cached: ${filename} (${(wavBuffer.length / 1024).toFixed(1)} KB, ${realDuration}s)`);
+      console.log(`  ✓ Cached: ${filename} (${(audioOutputBuffer.length / 1024).toFixed(1)} KB, ${duration}s)`);
     }
   }
 
-  // Write manifest to audio_cache/audio_manifest.json AND parent directory audio_manifest.json (for git tracking)
+  // Write single audio_manifest.json
   const manifestJson = JSON.stringify(manifest, null, 2);
-  const cacheManifestPath = path.join(resolvedOutput, "audio_manifest.json");
-  fs.writeFileSync(cacheManifestPath, manifestJson, "utf8");
+  fs.writeFileSync(manifestPath, manifestJson, "utf8");
 
-  // Also write to parent tts_stt/audio_manifest.json if resolvedOutput is audio_cache
-  if (path.basename(resolvedOutput) === "audio_cache") {
-    const parentManifestPath = path.resolve(resolvedOutput, "../audio_manifest.json");
-    fs.writeFileSync(parentManifestPath, manifestJson, "utf8");
-  }
-
-  console.log(`\n[PrecomputeAudio] Precomputation completed! Manifest written to: ${cacheManifestPath}`);
-  console.log(`[PrecomputeAudio] Total audio files cached: ${manifest.length}`);
+  console.log(`\n[PrecomputeAudio] Precomputation completed! Manifest written to: ${manifestPath}`);
+  console.log(`[PrecomputeAudio] Total audio entries: ${manifest.length}`);
 
   return manifest;
+}
+
+// Direct CLI execution
+if (process.argv[1]?.endsWith("precompute-scheme-audio.ts") || process.argv[1]?.endsWith("precompute-scheme-audio.js")) {
+  const args = process.argv.slice(2);
+  const allowMock = args.includes("--allow-mock");
+  const force = args.includes("--force");
+
+  precomputeAllSchemeAudio({ allowMock, force })
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("[PrecomputeAudio] Error:", err.message || err);
+      process.exit(1);
+    });
 }
 
 // Direct CLI execution

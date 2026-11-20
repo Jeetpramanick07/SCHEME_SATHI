@@ -8,12 +8,7 @@ import { HelpCentreQuerySchema, SchemeQuerySchema } from "./schema.js";
 export const catalogueRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /schemes
   fastify.get("/schemes", async (request, reply) => {
-    const rawQuery = request.query as Record<string, unknown> | undefined;
     const query = SchemeQuerySchema.parse(request.query);
-    if (!rawQuery?.lang && query.household_id) {
-      const { HouseholdService } = await import("../households/service.js");
-      query.lang = await HouseholdService.getPreferredLang(query.household_id);
-    }
     const etag = CatalogueService.generateETag(JSON.stringify(query));
 
     if (request.headers["if-none-match"] === etag) {
@@ -44,13 +39,8 @@ export const catalogueRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /schemes/:id
   fastify.get("/schemes/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    const query = request.query as { lang?: "en" | "hi" | "mr"; household_id?: string };
-    let lang = query.lang;
-    if (!lang && query.household_id) {
-      const { HouseholdService } = await import("../households/service.js");
-      lang = await HouseholdService.getPreferredLang(query.household_id);
-    }
-    if (!lang) lang = "en";
+    const query = request.query as { lang?: "en" | "hi" | "mr" };
+    const lang = query.lang || "en";
 
     const etag = CatalogueService.generateETag(`scheme:${id}:${lang}`);
     if (request.headers["if-none-match"] === etag) {
@@ -112,5 +102,21 @@ export const catalogueRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /beneficiary-categories
   fastify.get("/beneficiary-categories", async () => {
     return await db.select().from(schema.beneficiaryCategories);
+  });
+
+  // GET /faqs
+  fastify.get("/faqs", async (request) => {
+    const query = request.query as { q?: string; scheme_id?: string; limit?: string };
+    return await CatalogueService.searchFaqs({
+      q: query.q,
+      scheme_id: query.scheme_id,
+      limit: query.limit ? parseInt(query.limit, 10) : 20,
+    });
+  });
+
+  // GET /schemes/:id/faqs
+  fastify.get("/schemes/:id/faqs", async (request) => {
+    const { id } = request.params as { id: string };
+    return await CatalogueService.getSchemeFaqs(id);
   });
 };

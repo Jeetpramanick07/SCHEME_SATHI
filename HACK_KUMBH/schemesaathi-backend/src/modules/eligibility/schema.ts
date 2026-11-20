@@ -32,6 +32,7 @@ export const EvaluateRequestSchema = z.object({
   lang: z.enum(["en", "hi", "mr"]).optional().default("en"),
   include_all: z.boolean().optional().default(false),
   include_test: z.boolean().optional(),
+  include_explore: z.boolean().optional().default(false),
 });
 
 export const NextQuestionsRequestSchema = z.object({

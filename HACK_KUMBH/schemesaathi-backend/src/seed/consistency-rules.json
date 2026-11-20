@@ -1,0 +1,46 @@
+[
+  {
+    "id": "dob_vs_age",
+    "code": "DOB_AGE_MISMATCH",
+    "field": "age",
+    "age_tolerance_years": 1,
+    "message_key": "consistency.dob_age_mismatch",
+    "needs_verification": false,
+    "description": "Declared age does not match calculated age from date of birth beyond tolerance margin"
+  },
+  {
+    "id": "income_vs_bpl",
+    "code": "BPL_HIGH_INCOME",
+    "field": "annual_family_income",
+    "max_bpl_annual_income": 150000,
+    "message_key": "consistency.bpl_high_income",
+    "needs_verification": true,
+    "description": "Annual family income is unusually high for a BPL/Antyodaya household"
+  },
+  {
+    "id": "marital_status_vs_family_size",
+    "code": "MARRIED_SINGLE_MEMBER",
+    "field": "family_size",
+    "min_married_family_size": 2,
+    "message_key": "consistency.married_single_member",
+    "needs_verification": true,
+    "description": "Applicant is declared married but household family size is declared as 1"
+  },
+  {
+    "id": "widow_vs_gender",
+    "code": "WIDOW_GENDER_MISMATCH",
+    "field": "marital_status",
+    "message_key": "consistency.widow_gender_mismatch",
+    "needs_verification": false,
+    "description": "Applicant is marked as widow but gender is declared as male"
+  },
+  {
+    "id": "landholding_vs_farmer_type",
+    "code": "MARGINAL_FARMER_LAND_MISMATCH",
+    "field": "landholding_hectares",
+    "max_marginal_land_hectares": 1.0,
+    "message_key": "consistency.marginal_farmer_land_mismatch",
+    "needs_verification": true,
+    "description": "Declared agricultural landholding exceeds statutory limit for marginal farmers"
+  }
+]

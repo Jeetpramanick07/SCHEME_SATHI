@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+
+# Environment files
+.env
+.env.*
+.env.local
+!.env.example
+
+# Playwright & test reports
+test-results/
+playwright-report/
+blob-report/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -16,3 +16,10 @@ export const PatchApplicationStatusSchema = z.object({
 export const UpdateStepStatusSchema = z.object({
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"]),
 });
+
+export const RecordOutcomeSchema = z.object({
+  outcome: z.enum(["approved", "rejected", "pending", "withdrawn"]),
+  rejection_reason_code: z.string().optional(),
+  rejection_note: z.string().optional(),
+  outcome_recorded_by_role: z.string().optional(),
+});

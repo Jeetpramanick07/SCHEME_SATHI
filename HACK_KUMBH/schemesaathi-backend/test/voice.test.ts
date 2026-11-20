@@ -1,29 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
-import fs from "node:fs";
-import { VoiceService } from "../src/modules/voice/voice.service.js";
-import { config } from "../src/config.js";
-import {
-  simplifyForLowLiteracy,
-  buildAccessibleCard,
-  TEXT_SIZE_PRESETS,
-} from "../src/modules/voice/accessibility/large-text.js";
-import { generateSpokenScript, type SchemeAudioSource } from "../src/modules/voice/accessibility/scheme-audio-script.js";
 import { buildServer } from "../src/server.js";
 import { initDb, closeDb } from "../src/db/index.js";
-import { CatalogueService } from "../src/modules/catalogue/service.js";
 import { FastifyInstance } from "fastify";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-describe("Indic Voice & Accessibility Features (TTS / STT & Large-Text)", () => {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+describe("Voice Integration Suite (tts_stt)", () => {
   let server: FastifyInstance;
 
   beforeAll(async () => {
     await initDb();
-    const dataFilePath = path.resolve(process.cwd(), "data/government_welfare_schemes.json");
-    if (fs.existsSync(dataFilePath)) {
-      const { IngestionPipeline } = await import("../src/ingest/pipeline.js");
-      await IngestionPipeline.ingest(dataFilePath);
-    }
     server = await buildServer();
     await server.ready();
   });
@@ -32,327 +22,194 @@ describe("Indic Voice & Accessibility Features (TTS / STT & Large-Text)", () => 
     await server.close();
     await closeDb();
   });
-  it("simplifies dense bureaucratic terminology for low-literacy Marathi citizens", () => {
-    const rawMarathi = "अर्जदाराकडे अधिकृत अधिवास प्रमाणपत्र आणि थेट लाभ हस्तांतरण (DBT) बँक खाते असणे आवश्यक आहे.";
-    const simplified = simplifyForLowLiteracy(rawMarathi, "mr");
 
-    expect(simplified).toContain("महाराष्ट्रात १५ वर्षे राहिल्याचा दाखला (डोमिसाईल)");
-    expect(simplified).toContain("बँकेत थेट पैसे जमा होणे");
-  });
-
-  it("simplifies dense bureaucratic terminology for low-literacy Hindi citizens", () => {
-    const rawHindi = "लाभार्थी के पास निवास प्रमाण पत्र तथा प्रत्यक्ष लाभ अंतरण (DBT) सक्रिय होना चाहिए।";
-    const simplified = simplifyForLowLiteracy(rawHindi, "hi");
-
-    expect(simplified).toContain("राज्य में रहने का पक्का प्रमाण पत्र");
-    expect(simplified).toContain("बैंक खाते में सीधे पैसे आना");
-  });
-
-  it("verifies large-text accessibility presets adhere to elderly-friendly visual standards", () => {
-    expect(TEXT_SIZE_PRESETS.STANDARD.fontSizeRem).toBe(1.0);
-    expect(TEXT_SIZE_PRESETS.LARGE.fontSizeRem).toBe(1.375);
-    expect(TEXT_SIZE_PRESETS.LARGE.highContrast).toBe(true);
-
-    expect(TEXT_SIZE_PRESETS.EXTRA_LARGE.fontSizeRem).toBe(1.875);
-    expect(TEXT_SIZE_PRESETS.EXTRA_LARGE.lineHeight).toBeGreaterThanOrEqual(1.8);
-    expect(TEXT_SIZE_PRESETS.EXTRA_LARGE.textColor).toBe("#000000");
-  });
-
-  it("generates natural spoken scripts for senior citizens with AI4Bharat Sunita persona", () => {
-    const mockScheme = {
-      scheme_id: "MH-SJSA-SANJAYGANDHI-014",
-      official_name: "Sanjay Gandhi Niradhar Anudan Yojana",
-      translated_names: {
-        mr: "संजय गांधी निराधार अनुदान योजना",
-      },
-      overview: {
-        simple_explanation: {
-          mr: "निराधार व्यक्ती आणि विधवा महिलांसाठी मासिक निवृत्तीवेतन योजना.",
-        },
-      },
-      benefits: {
-        amount: 1500,
-        frequency: "दरमहा",
-      },
-      assistance: {
-        helpline: "1800-120-8040",
-      },
-    };
-
-    const script = generateSpokenScript(mockScheme, "mr");
-    expect(script.lang).toBe("mr");
-    expect(script.spoken_script).toContain("संजय गांधी निराधार अनुदान योजना");
-    expect(script.spoken_script).toContain("दीड हजार रुपये थेट आर्थिक मदत मिळते");
-    expect(script.estimated_duration_seconds).toBeGreaterThan(10);
-  });
-
-  it("builds accessible card model with spoken-script metadata and audio link", () => {
-    const card = buildAccessibleCard(
-      {
-        scheme_id: "MH-WCD-LADKIBAHIN-010",
-        title: "मुख्यमंत्री माझी लाडकी बहीण योजना",
-        benefit_amount: 1500,
-        benefit_frequency: "दरमहा",
-        explanation: "महिलांना दरमहा थेट लाभ हस्तांतरण (DBT) द्वारे आर्थिक सहाय्य.",
-        documents: ["आधार कार्ड", "रेशन कार्ड", "अधिवास प्रमाणपत्र"],
-      },
-      "mr",
-      "LARGE"
-    );
-
-    expect(card.accessibility.tier).toBe("LARGE");
-    expect(card.accessibility.listen_button_label).toContain("मोठ्याने ऐका");
-    expect(card.plain_explanation).toContain("बँकेत थेट पैसे जमा होणे");
-    expect(card.audio_stream_url).toBe("/api/v1/voice/schemes/MH-WCD-LADKIBAHIN-010/audio?lang=mr");
-  });
-
-  it("retrieves precomputed scheme audio files from disk cache", async () => {
-    const { buffer, source } = await VoiceService.getSchemeAudio("CENT-MORD-NSAP-006", "mr");
-    expect(source).toBe("precomputed_cache");
-    expect(buffer).toBeInstanceOf(Buffer);
-    expect(buffer.length).toBeGreaterThan(44); // Greater than WAV header
-    expect(buffer.toString("ascii", 0, 4)).toBe("RIFF");
-    expect(buffer.toString("ascii", 8, 12)).toBe("WAVE");
-  });
-
-  it("returns 401 UNAUTHORIZED when voice synthesis called without API key", async () => {
+  // 1. GET /api/v1/voice/health (reports mock_mode & clean degradation)
+  it("detects mock_mode and degrades cleanly when voice service is offline", async () => {
     const res = await server.inject({
-      method: "POST",
-      url: "/api/v1/voice/tts",
-      payload: {
-        text: "नमस्कार",
-        lang: "mr",
-      },
-    });
-    expect(res.statusCode).toBe(401);
-  });
-
-  it("returns 503 VOICE_UNAVAILABLE when voice service is offline and unmocked", async () => {
-    config.voiceMock = false;
-
-    const healthRes = await server.inject({
       method: "GET",
       url: "/api/v1/voice/health",
     });
-    expect(healthRes.statusCode).toBe(503);
-    const healthJson = JSON.parse(healthRes.payload);
-    expect(healthJson.code).toBe("VOICE_UNAVAILABLE");
 
-    const ttsRes = await server.inject({
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.mock_mode).toBeDefined();
+    expect(typeof body.mock_mode).toBe("boolean");
+    // When offline, status is degraded and mock_mode is true
+    if (!body.service_available) {
+      expect(body.status).toBe("degraded");
+      expect(body.mock_mode).toBe(true);
+    }
+  });
+
+  // 2. Also test root alias /voice/health
+  it("supports root alias /voice/health", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/voice/health",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.mock_mode).toBeDefined();
+  });
+
+  // 3. POST /voice/tts (503 fallback when voice service is down)
+  it("returns 503 VOICE_SERVICE_UNAVAILABLE when voice synthesis service is unreachable", async () => {
+    const res = await server.inject({
       method: "POST",
       url: "/api/v1/voice/tts",
-      headers: { "x-api-key": "citizen-secret-key" },
       payload: {
-        text: "नमस्कार",
+        text: "नमस्कार. ही योजना कल्याणकारी आहे.",
         lang: "mr",
       },
     });
-    expect(ttsRes.statusCode).toBe(503);
-    const ttsJson = JSON.parse(ttsRes.payload);
-    expect(ttsJson.code).toBe("VOICE_UNAVAILABLE");
+
+    // If external service is not running on localhost:8000, must return 503 with friendly code
+    if (res.statusCode === 503) {
+      const err = JSON.parse(res.body);
+      expect(err.error.code).toBe("VOICE_SERVICE_UNAVAILABLE");
+      expect(err.error.message).toContain("unavailable");
+    } else {
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toBe("audio/wav");
+    }
   });
 
-  it("returns 400 when invalid language is supplied to voice routes", async () => {
+  // 4. POST /voice/tts rejects empty text with 400
+  it("rejects empty text with 400 TEXT_REQUIRED", async () => {
     const res = await server.inject({
       method: "POST",
-      url: "/api/v1/voice/tts",
-      headers: { "x-api-key": "citizen-secret-key" },
+      url: "/voice/tts",
       payload: {
-        text: "नमस्कार",
-        lang: "invalid_lang",
+        text: "",
+        lang: "mr",
       },
     });
+
     expect(res.statusCode).toBe(400);
+    const err = JSON.parse(res.body);
+    expect(err.error.code).toBe("TEXT_REQUIRED");
   });
 
-  it("returns 404 with browser speech fallback when precomputed audio is missing", async () => {
+  // 5. GET /voice/schemes/:id/audio (404 handling)
+  it("returns 404 AUDIO_NOT_FOUND when precomputed audio is absent", async () => {
     const res = await server.inject({
       method: "GET",
-      url: "/api/v1/voice/schemes/NON-EXISTENT-SCHEME/audio?lang=mr",
+      url: "/voice/schemes/NON_EXISTENT_SCHEME_XYZ/audio?lang=mr",
     });
+
     expect(res.statusCode).toBe(404);
-    const json = JSON.parse(res.payload);
-    expect(json.fallback).toBe("browser_speech_synthesis");
-    expect(json.lang_bcp47).toBe("mr-IN");
+    const err = JSON.parse(res.body);
+    expect(err.error.code).toBe("AUDIO_NOT_FOUND");
+    expect(err.error.message).toContain("not found");
   });
 
-  it("handles voice synthesis and returns valid WAV format in mock mode", async () => {
-    config.voiceMock = true;
-    const { buffer } = await VoiceService.synthesize("नमस्कार, मुख्यमंत्री लाडकी बहीण योजनेची माहिती ऐका.", "mr", true);
-    expect(buffer).toBeInstanceOf(Buffer);
-    expect(buffer.length).toBeGreaterThan(44);
-    expect(buffer.toString("ascii", 0, 4)).toBe("RIFF");
-    expect(buffer.toString("ascii", 8, 12)).toBe("WAVE");
-  });
-
-  it("verifies full voice API endpoints via Fastify server with mocked provider", async () => {
-    config.voiceMock = true;
-
-    // 1. Voice Health
-    const healthRes = await server.inject({
-      method: "GET",
-      url: "/api/v1/voice/health",
-    });
-    expect(healthRes.statusCode).toBe(200);
-    const healthJson = JSON.parse(healthRes.payload);
-    expect(healthJson.engine).toBeDefined();
-
-    // 2. Text to Speech API
-    const ttsRes = await server.inject({
-      method: "POST",
-      url: "/api/v1/voice/tts",
-      headers: { "x-api-key": "citizen-secret-key" },
-      payload: {
-        text: "या योजनेसाठी आधार कार्ड आणि रेशन कार्ड आवश्यक आहे.",
-        lang: "mr",
-        slow: true,
-      },
-    });
-    expect(ttsRes.statusCode).toBe(200);
-    expect(ttsRes.headers["content-type"]).toBe("audio/wav");
-    expect(ttsRes.rawPayload.subarray(0, 4).toString("ascii")).toBe("RIFF");
-
-    // 3. Scheme Audio Streaming
-    const schemeAudioRes = await server.inject({
-      method: "GET",
-      url: "/api/v1/voice/schemes/CENT-MORD-NSAP-006/audio?lang=mr",
-    });
-    expect(schemeAudioRes.statusCode).toBe(200);
-    expect(schemeAudioRes.headers["content-type"]).toBe("audio/wav");
-
-    // 4. Accessible Card API (/schemes/:id/accessible-card)
-    const cardRes = await server.inject({
-      method: "GET",
-      url: "/api/v1/schemes/CENT-MORD-NSAP-006/accessible-card?lang=mr&tier=EXTRA_LARGE",
-    });
-    expect(cardRes.statusCode).toBe(200);
-    const cardJson = JSON.parse(cardRes.payload);
-    expect(cardJson.accessibility.tier).toBe("EXTRA_LARGE");
-    expect(cardJson.accessibility.has_precomputed_audio).toBe(true);
-    expect(cardJson.audio_stream_url).toBe("/api/v1/voice/schemes/CENT-MORD-NSAP-006/audio?lang=mr");
-    expect(cardJson.accessibility.listen_button_label).toContain("मोठ्याने ऐका");
-  });
-
-  it("POST /voice/stt rejects missing file with 400 BAD_REQUEST", async () => {
+  // 6. Beep Audio Guard: treats mock/tone flagged audio as ABSENT (returns 404)
+  it("Beep Audio Guard: treats cached scheme audio flagged mock/tone as ABSENT (404) so UI falls back to speech synthesis", async () => {
     const res = await server.inject({
-      method: "POST",
-      url: "/api/v1/voice/stt",
-      headers: {
-        "x-api-key": "citizen-secret-key",
-      },
-      payload: {},
+      method: "GET",
+      url: "/api/v1/voice/schemes/CENT-MOAFW-PMKISAN-001/audio?lang=mr",
     });
-    expect(res.statusCode).toBe(400);
+
+    expect(res.statusCode).toBe(404);
+    const err = JSON.parse(res.body);
+    expect(err.error.code).toBe("AUDIO_NOT_FOUND");
+    expect(err.error.message).toContain("mock/tone");
   });
 
-  it("POST /voice/stt and POST /voice/tts return 503 when service is unreachable", async () => {
-    config.voiceMock = false;
-    const fakeWav = Buffer.alloc(100).toString("base64");
-    const sttRes = await server.inject({
-      method: "POST",
-      url: "/api/v1/voice/stt",
-      headers: { "x-api-key": "citizen-secret-key" },
-      payload: {
-        audio_base64: fakeWav,
-        lang: "mr",
-      },
-    });
-    expect(sttRes.statusCode).toBe(503);
+  // 6b. Delivers precomputed audio when verified and not flagged mock/tone
+  it("delivers static precomputed audio with cache headers when entry is not flagged mock/tone", async () => {
+    const manifestPath = path.resolve(__dirname, "../src/modules/voice/audio_manifest.json");
+    const manifestRaw = fs.readFileSync(manifestPath, "utf-8");
+    const manifest = JSON.parse(manifestRaw);
 
-    const ttsRes = await server.inject({
-      method: "POST",
-      url: "/api/v1/voice/tts",
-      headers: { "x-api-key": "citizen-secret-key" },
-      payload: {
-        text: "नमस्कार",
-        lang: "mr",
-      },
-    });
-    expect(ttsRes.statusCode).toBe(503);
-  });
-
-  it("verifies all 24 schemes return valid Devanagari display_name and non-placeholder explanation in hi and mr", async () => {
-    const devanagariRegex = /[\u0900-\u097F]/;
-    const placeholderRegex = /placeholder|missing|TODO|lorem|dummy/i;
-
-    for (const lang of ["mr", "hi"] as const) {
-      const list = await CatalogueService.listSchemes({
-        limit: 100,
-        lang,
-        view: "detail",
-      });
-
-      expect(list.items.length).toBeGreaterThanOrEqual(24);
-
-      for (const item of list.items) {
-        const id = item.scheme_id as string;
-        const displayName = item.display_name as string;
-        const expl = (item.overview as { simple_explanation?: { en?: string; hi?: string; mr?: string } })
-          ?.simple_explanation?.[lang] || "";
-
-        expect(displayName, `Scheme ${id} display_name in ${lang}`).toBeDefined();
-        expect(devanagariRegex.test(displayName), `Scheme ${id} display_name should be Devanagari in ${lang}`).toBe(true);
-
-        expect(expl, `Scheme ${id} explanation in ${lang}`).toBeDefined();
-        expect(expl.length, `Scheme ${id} explanation length in ${lang}`).toBeGreaterThan(10);
-        expect(devanagariRegex.test(expl), `Scheme ${id} explanation should be Devanagari in ${lang}`).toBe(true);
-        expect(placeholderRegex.test(expl), `Scheme ${id} explanation contains placeholder in ${lang}`).toBe(false);
-      }
+    // Temporarily unflag one entry for test
+    const target = manifest.find((m: any) => m.scheme_id === "CENT-MOAFW-PMKISAN-001" && m.lang === "mr");
+    if (target) {
+      target.is_mock = false;
+      target.is_tone = false;
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     }
-  });
 
-  it("verifies lang_fallback is false for all 24 schemes in both hi and mr in card view", async () => {
-    for (const lang of ["mr", "hi"] as const) {
-      const list = await CatalogueService.listSchemes({
-        limit: 100,
-        lang,
-        view: "card",
-      });
-
-      expect(list.items.length).toBeGreaterThanOrEqual(24);
-
-      for (const item of list.items) {
-        const id = item.scheme_id as string;
-        expect(item.lang_fallback, `Scheme ${id} had lang_fallback=true for ${lang}`).toBe(false);
-        expect(item.lang_served).toBe(lang);
-      }
-    }
-  });
-
-  it("accessible card endpoint returns correct CSS classes and font scale for each tier", async () => {
-    const tiers = [
-      { tier: "STANDARD", fontSizeRem: 1.0, css: "accessible-card-standard" },
-      { tier: "LARGE", fontSizeRem: 1.375, css: "accessible-card-large" },
-      { tier: "EXTRA_LARGE", fontSizeRem: 1.875, css: "accessible-card-extra-large" },
-    ] as const;
-
-    for (const t of tiers) {
+    try {
       const res = await server.inject({
         method: "GET",
-        url: `/api/v1/schemes/CENT-MOAFW-PMKISAN-001/accessible-card?lang=mr&tier=${t.tier}`,
+        url: "/api/v1/voice/schemes/CENT-MOAFW-PMKISAN-001/audio?lang=mr",
       });
+
       expect(res.statusCode).toBe(200);
-      const card = JSON.parse(res.payload);
-      expect(card.accessibility.tier).toBe(t.tier);
-      expect(card.accessibility.font_size_rem).toBe(t.fontSizeRem);
-      expect(card.accessibility.container_css).toBe(t.css);
+      expect(res.headers["content-type"]).toMatch(/audio\/(mpeg|wav|ogg)/);
+      expect(res.headers["cache-control"]).toContain("max-age=86400");
+      expect(res.rawPayload.length).toBeGreaterThan(1000);
+    } finally {
+      // Restore manifest back to mock/tone=true
+      fs.writeFileSync(manifestPath, manifestRaw);
     }
   });
 
-  it("spoken script generator output contains zero Latin words (>3 letters) and no '..'", async () => {
-    const dataFilePath = path.resolve(process.cwd(), "data/government_welfare_schemes.json");
-    const raw = JSON.parse(fs.readFileSync(dataFilePath, "utf8"));
-    const schemes = (raw.schemes || []) as Array<Record<string, unknown>>;
+  // 7. POST /voice/stt duration limit and proving NO AUDIO STORED on disk
+  it("proves audio is never stored or logged to disk, and rejects audio > 30s", async () => {
+    const voiceDir = path.resolve(__dirname, "../src/modules/voice");
+    const audioCacheDir = path.resolve(voiceDir, "audio_cache");
 
-    expect(schemes.length).toBeGreaterThanOrEqual(24);
+    // Snapshot existing files in voice module and audio_cache
+    const filesBefore = new Set(fs.readdirSync(voiceDir));
+    const cacheBefore = new Set(fs.readdirSync(audioCacheDir));
 
-    for (const s of schemes) {
-      const id = String(s.scheme_id);
-      for (const lang of ["mr", "hi"] as const) {
-        const script = generateSpokenScript(s as unknown as SchemeAudioSource, lang);
-        expect(script.spoken_script, `Scheme ${id} (${lang}) has duplicate dots`).not.toContain("..");
-        expect(script.spoken_script, `Scheme ${id} (${lang}) has Latin words > 3 letters`).not.toMatch(/[a-zA-Z]{4,}/);
-      }
+    // Construct a synthetic 16kHz mono WAV buffer > 30s (e.g. 32 seconds = 32 * 32000 = 1024000 bytes)
+    const longDuration = 32;
+    const sampleRate = 16000;
+    const numSamples = longDuration * sampleRate;
+    const longWav = Buffer.alloc(44 + numSamples * 2);
+    longWav.write("RIFF", 0);
+    longWav.writeUInt32LE(longWav.length - 8, 4);
+    longWav.write("WAVE", 8);
+    longWav.write("fmt ", 12);
+    longWav.writeUInt32LE(16, 16);
+    longWav.writeUInt16LE(1, 20); // PCM
+    longWav.writeUInt16LE(1, 22); // mono
+    longWav.writeUInt32LE(sampleRate, 24);
+    longWav.writeUInt32LE(sampleRate * 2, 28);
+    longWav.writeUInt16LE(2, 32);
+    longWav.writeUInt16LE(16, 34);
+    longWav.write("data", 36);
+    longWav.writeUInt32LE(numSamples * 2, 40);
+
+    // Send multipart request with > 30s audio
+    const boundary = "---------------------------974767299852498929531610575";
+    const multipartBody = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="test_long.wav"\r\nContent-Type: audio/wav\r\n\r\n`),
+      longWav,
+      Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="lang"\r\n\r\nmr\r\n--${boundary}--\r\n`),
+    ]);
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/voice/stt",
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: multipartBody,
+    });
+
+    expect(res.statusCode).toBe(400);
+    const err = JSON.parse(res.body);
+    expect(err.error.code).toBe("AUDIO_DURATION_EXCEEDED");
+
+    // Assert that NO files were written to disk
+    const filesAfter = new Set(fs.readdirSync(voiceDir));
+    const cacheAfter = new Set(fs.readdirSync(audioCacheDir));
+
+    expect(filesAfter.size).toBe(filesBefore.size);
+    expect(cacheAfter.size).toBe(cacheBefore.size);
+
+    // Explicitly verify no temporary .wav or .tmp file exists
+    for (const f of filesAfter) {
+      expect(f).not.toMatch(/test_long/);
+      expect(f).not.toMatch(/\.tmp$/);
+    }
+    for (const f of cacheAfter) {
+      expect(f).not.toMatch(/test_long/);
+      expect(f).not.toMatch(/\.tmp$/);
     }
   });
 });

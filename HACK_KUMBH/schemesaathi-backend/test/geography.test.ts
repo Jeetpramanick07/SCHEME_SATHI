@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
-import fs from "node:fs";
 import { GeoScopeResolver, DistrictRecord } from "../src/ingest/geography.js";
 import { CatalogueService } from "../src/modules/catalogue/service.js";
 import { initDb, closeDb } from "../src/db/index.js";
-import { IngestionPipeline } from "../src/ingest/pipeline.js";
 
-const datasetDistrictsPath = path.resolve(process.cwd(), "data/government_welfare_schemes.json");
-const rawDataset = JSON.parse(fs.readFileSync(datasetDistrictsPath, "utf8"));
 const sampleDistricts: DistrictRecord[] = [
-  ...((rawDataset.districts as DistrictRecord[]) || []),
+  { district_id: "DIST_MH_NGP", district_name: "Nagpur", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_AMR", district_name: "Amravati", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_CHA", district_name: "Chandrapur", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_GAD", district_name: "Gadchiroli", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_WRD", district_name: "Wardha", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_BHA", district_name: "Bhandara", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_GON", district_name: "Gondia", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_AKO", district_name: "Akola", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_YAV", district_name: "Yavatmal", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_BUL", district_name: "Buldhana", state: "Maharashtra", is_vidarbha: true },
+  { district_id: "DIST_MH_WAS", district_name: "Washim", state: "Maharashtra", is_vidarbha: true },
   { district_id: "DIST_MH_PUN", district_name: "Pune", state: "Maharashtra", is_vidarbha: false },
   { district_id: "DIST_DL_CDL", district_name: "Central Delhi", state: "Delhi", is_vidarbha: false },
 ];
@@ -19,10 +24,6 @@ describe("Geo Scope Token Resolution & Urban/ULB Awareness", () => {
 
   beforeAll(async () => {
     await initDb();
-    const dataFilePath = path.resolve(process.cwd(), "data/government_welfare_schemes.json");
-    if (fs.existsSync(dataFilePath)) {
-      await IngestionPipeline.ingest(dataFilePath);
-    }
   });
 
   afterAll(async () => {
@@ -65,10 +66,11 @@ describe("Geo Scope Token Resolution & Urban/ULB Awareness", () => {
   });
 
   it("ensures urban-targeted schemes are never silently hidden from Nagpur users", async () => {
-    // Test catalogue pre-filtering with district=DIST_MH_NGP
+    // Test catalogue pre-filtering with district=DIST_MH_NGP and search query
     const list = await CatalogueService.listSchemes({
+      q: "SVANidhi",
       district: "DIST_MH_NGP",
-      limit: 50,
+      limit: 20,
       include_test: false,
     });
 

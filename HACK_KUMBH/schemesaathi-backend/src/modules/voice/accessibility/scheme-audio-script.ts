@@ -93,6 +93,54 @@ export function convertAmountToDevanagariWords(amount: number | string, lang: "m
   return `${num} रुपये`;
 }
 
+const DIGIT_WORDS: Record<string, { mr: string; hi: string }> = {
+  "0": { mr: "शून्य", hi: "शून्य" },
+  "1": { mr: "एक", hi: "एक" },
+  "2": { mr: "दोन", hi: "दो" },
+  "3": { mr: "तीन", hi: "तीन" },
+  "4": { mr: "चार", hi: "चार" },
+  "5": { mr: "पाच", hi: "पांच" },
+  "6": { mr: "सहा", hi: "छह" },
+  "7": { mr: "सात", hi: "सात" },
+  "8": { mr: "आठ", hi: "आठ" },
+  "9": { mr: "नऊ", hi: "नौ" },
+};
+
+export function convertHelplineToSpoken(rawHelpline: string, lang: "mr" | "hi"): string {
+  const numbers = rawHelpline.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+  const spokenNumbers: string[] = [];
+
+  for (const numStr of numbers) {
+    let groups = numStr.split(/[- ]+/).filter(Boolean);
+    if (groups.length === 1) {
+      const digits = groups[0]!.replace(/[^0-9]/g, "");
+      if (digits.length <= 4) {
+        groups = [digits];
+      } else if (digits.length === 5) {
+        groups = [digits.slice(0, 2), digits.slice(2)];
+      } else if (digits.length === 6) {
+        groups = [digits.slice(0, 3), digits.slice(3)];
+      } else if (digits.length === 10) {
+        groups = [digits.slice(0, 4), digits.slice(4, 7), digits.slice(7)];
+      } else {
+        groups = digits.match(/.{1,3}/g) || [digits];
+      }
+    }
+
+    const spokenGroups = groups.map((grp) => {
+      return grp
+        .split("")
+        .map((ch) => DIGIT_WORDS[ch]?.[lang] || ch)
+        .join(" ");
+    });
+
+    spokenNumbers.push(spokenGroups.join(", "));
+  }
+
+  const separator = lang === "mr" ? " किंवा " : " या ";
+  return spokenNumbers.join(separator);
+}
+
 function getBenefitSpokenText(
   benefitType: string | undefined,
   spokenAmount: string,
@@ -103,45 +151,56 @@ function getBenefitSpokenText(
 
   if (typeUpper.includes("INSURANCE") || typeUpper.includes("HEALTH")) {
     return isMr
-      ? `या योजनेअंतर्गत कुटुंबाला ${spokenAmount} मोफत आरोग्य विमा संरक्षण मिळते.`
-      : `इस योजना के तहत परिवार को ${spokenAmount} का मुफ्त स्वास्थ्य बीमा सुरक्षा मिलती है।`;
+      ? `ही योजना कुटुंबासाठी ${spokenAmount} मोफत आरोग्य विमा संरक्षण प्रदान करते.`
+      : `यह योजना परिवार के लिए ${spokenAmount} की मुफ्त स्वास्थ्य बीमा सुरक्षा प्रदान करती है।`;
   }
   if (typeUpper.includes("SUBSIDY")) {
     return isMr
-      ? `या योजनेअंतर्गत तुम्हाला ${spokenAmount} थेट सरकारी अनुदान सबसिडी मिळते.`
-      : `इस योजना के तहत आपको ${spokenAmount} की सीधी सरकारी अनुदान सहायता मिलती है।`;
+      ? `ही योजना ${spokenAmount} थेट सरकारी अनुदान सबसिडी प्रदान करते.`
+      : `यह योजना ${spokenAmount} की सीधी सरकारी अनुदान सहायता प्रदान करती है।`;
   }
   if (typeUpper.includes("CREDIT") || typeUpper.includes("LOAN")) {
     return isMr
-      ? `या योजनेअंतर्गत व्यवसायासाठी ${spokenAmount} पर्यंत सुलभ कर्ज मिळते.`
-      : `इस योजना के तहत व्यवसाय के लिए ${spokenAmount} तक का आसान बैंक लोन मिलता है।`;
+      ? `ही योजना व्यवसायासाठी ${spokenAmount} पर्यंत सुलभ कर्ज सहाय्य प्रदान करते.`
+      : `यह योजना व्यवसाय के लिए ${spokenAmount} तक का आसान ऋण सहयोग प्रदान करती है।`;
   }
   if (typeUpper.includes("EDUCATION") || typeUpper.includes("STIPEND")) {
     return isMr
-      ? `या योजनेअंतर्गत शिक्षणासाठी आणि प्रशिक्षणासाठी ${spokenAmount} सहाय्य मिळते.`
-      : `इस योजना के तहत पढ़ाई और प्रशिक्षण के लिए ${spokenAmount} की मदद मिलती है।`;
+      ? `ही योजना शिक्षणासाठी आणि प्रशिक्षणासाठी ${spokenAmount} सहाय्य प्रदान करते.`
+      : `यह योजना पढ़ाई और प्रशिक्षण के लिए ${spokenAmount} की सहायता प्रदान करती है।`;
   }
   // Default cash / financial
   return isMr
-    ? `या योजनेअंतर्गत तुम्हाला ${spokenAmount} थेट आर्थिक मदत मिळते.`
-    : `इस योजना के तहत आपको ${spokenAmount} की सीधी वित्तीय सहायता मिलती है।`;
+    ? `ही योजना ${spokenAmount} थेट आर्थिक सहाय्य प्रदान करते.`
+    : `यह योजना ${spokenAmount} की सीधी वित्तीय सहायता प्रदान करती है।`;
 }
 
 /**
- * Clean Latin words and technical symbols from spoken titles
+ * Clean Latin words and technical symbols from spoken texts
  */
-function cleanDevanagariTitle(title: string): string {
-  return title
+function cleanDevanagariText(text: string): string {
+  return text
     .replace(/\bPM-KISAN\b/gi, "पीएम-किसान")
     .replace(/\bPM-JAY\b/gi, "पीएम-जय")
     .replace(/\bPM-SYM\b/gi, "पीएम-श्रम योगी")
     .replace(/\bPMAY-U\b/gi, "पीएम आवास")
     .replace(/\bPMAY-G\b/gi, "पीएम आवास ग्रामीण")
+    .replace(/\bPMAY\b/gi, "पीएम आवास")
     .replace(/\bPMMVY\b/gi, "मातृ वंदना")
     .replace(/\bDMF\b/gi, "जिल्हा खनिकर्म प्रतिष्ठान")
     .replace(/\bEBC\b/gi, "ईबीसी")
     .replace(/\bPoCRA\b/gi, "पोकरा")
     .replace(/\bMAHABOCW\b/gi, "महाबोकव")
+    .replace(/\bNSAP\b/gi, "राष्ट्रीय सामाजिक सहाय्य")
+    .replace(/\bDBT\b/gi, "थेट बँक लाभ")
+    .replace(/\bBPL\b/gi, "दारिद्र्य रेषा")
+    .replace(/\bMJPJAY\b/gi, "महात्मा फुले जन आरोग्य")
+    .replace(/\bCSC\b/gi, "सीएससी")
+    .replace(/\be-KYC\b/gi, "ई-केवायसी")
+    .replace(/\bKYC\b/gi, "केवायसी")
+    .replace(/\bUDID\b/gi, "युडीआयडी")
+    .replace(/\bCAP\b/gi, "कॅप")
+    .replace(/\bULB\b/gi, "स्थानिक संस्था")
     .replace(/[()]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -179,13 +238,32 @@ export function generateSpokenScript(
 ): SchemeAudioScript {
   const isMr = lang === "mr";
   const rawTitle = (scheme.translated_names && scheme.translated_names[lang]) || scheme.official_name;
-  const title = cleanDevanagariTitle(rawTitle);
+  const title = cleanDevanagariText(rawTitle);
 
   const rawExplanation =
     scheme.overview?.simple_explanation?.[lang] ||
     (isMr ? "शासकीय कल्याणकारी योजना." : "सरकारी कल्याणकारी योजना।");
 
-  const cleanExplanation = simplifyForLowLiteracy(rawExplanation, lang);
+  let cleanExplanation = cleanDevanagariText(simplifyForLowLiteracy(rawExplanation, lang));
+
+  // Neutralize any "you will receive" / "मिळतात" / "मिलते हैं" phrasing
+  if (isMr) {
+    cleanExplanation = cleanExplanation
+      .replace(/तुम्हाला\s+मिळतात/g, "प्रदान केले जातात")
+      .replace(/तुम्हाला\s+मिळते/g, "प्रदान केले जाते")
+      .replace(/मिळतात/g, "उपलब्ध आहेत")
+      .replace(/मिळते/g, "प्रदान केले जाते")
+      .replace(/तुम्हाला/g, "नागरिकांना");
+  } else {
+    cleanExplanation = cleanExplanation
+      .replace(/आपको\s+मिलते\s+हैं/g, "प्रदान किए जाते हैं")
+      .replace(/आपको\s+मिलती\s+है/g, "प्रदान की जाती है")
+      .replace(/आपको\s+मिलता\s+है/g, "प्रदान किया जाता है")
+      .replace(/मिलते\s+हैं/g, "उपलब्ध हैं")
+      .replace(/मिलती\s+है/g, "प्रदान की जाती है")
+      .replace(/मिलता\s+है/g, "प्रदान किया जाता है")
+      .replace(/आपको/g, "नागरिकों को");
+  }
 
   // Benefit segment (using spoken Devanagari words and template by benefit_type)
   let benefitText = "";
@@ -194,8 +272,8 @@ export function generateSpokenScript(
     benefitText = getBenefitSpokenText(scheme.benefits.benefit_type, spokenAmount, lang);
   } else {
     benefitText = isMr
-      ? "या योजनेअंतर्गत शासनाकडून विशेष योजना लाभ दिला जातो."
-      : "इस योजना के तहत सरकार द्वारा विशेष योजना लाभ दिया जाता है।";
+      ? "ही योजना शासनाकडून विशेष योजना लाभ प्रदान करते."
+      : "यह योजना सरकार द्वारा विशेष योजना लाभ प्रदान करती है।";
   }
 
   // Documents segment
@@ -208,13 +286,14 @@ export function generateSpokenScript(
     ? `अर्ज करण्यासाठी आधार कार्ड, रेशन कार्ड आणि बँक खात्याचा पुरावा अशी सुमारे ${spokenDocCount} कागदपत्रे लागतील.`
     : `आवेदन करने के लिए आधार कार्ड, राशन कार्ड और बैंक पासबुक जैसे लगभग ${spokenDocCount} दस्तावेज़ आवश्यक हैं।`;
 
-  // Assistance segment
+  // Assistance segment - Helpline digits spoken as grouped numbers
   const helpline = scheme.assistance?.helpline;
-  const cleanHelpline = helpline ? String(helpline).replace(/[^0-9,-]/g, "") : "";
-  const helplineText = cleanHelpline
+  const cleanHelpline = helpline ? String(helpline).replace(/[^0-9,-/ ]/g, "").trim() : "";
+  const spokenHelpline = cleanHelpline ? convertHelplineToSpoken(cleanHelpline, lang) : "";
+  const helplineText = spokenHelpline
     ? isMr
-      ? `अधिक माहितीसाठी हेल्पलाइन क्रमांक ${cleanHelpline} वर संपर्क करा किंवा जवळच्या आपले सरकार केंद्रात जा.`
-      : `अधिक जानकारी के लिए हेल्पलाइन नंबर ${cleanHelpline} पर कॉल करें या नजदीकी सीएससी केंद्र पर जाएं।`
+      ? `अधिक माहितीसाठी हेल्पलाइन क्रमांक ${spokenHelpline} वर संपर्क करा किंवा जवळच्या आपले सरकार केंद्रात जा.`
+      : `अधिक जानकारी के लिए हेल्पलाइन नंबर ${spokenHelpline} पर कॉल करें या नजदीकी सीएससी केंद्र पर जाएं।`
     : isMr
     ? `अधिक माहितीसाठी आपल्या ग्रामपंचायत किंवा आपले सरकार केंद्रात संपर्क साधा.`
     : `अधिक जानकारी के लिए अपने ग्राम पंचायत या सीएससी केंद्र पर संपर्क करें।`;

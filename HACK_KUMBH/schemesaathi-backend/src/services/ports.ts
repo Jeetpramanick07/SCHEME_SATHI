@@ -42,3 +42,35 @@ export interface TextExplainerRequest {
 export interface TextExplainer {
   simplifyExplanation(request: TextExplainerRequest): Promise<string>;
 }
+
+export interface PrefillResult {
+  attributes: {
+    age?: number;
+    gender?: "MALE" | "FEMALE" | "TRANSGENDER";
+    district?: string;
+  };
+  source: "digilocker" | "aadhaar_qr";
+  simulated: boolean;
+}
+
+export interface IdentityPrefill {
+  prefill(input: Record<string, unknown>): Promise<PrefillResult>;
+}
+
+export interface DocumentVerificationRequest {
+  documentId: string;
+  documentType: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DocumentVerificationResult {
+  verified: boolean;
+  documentId: string;
+  issuer?: string;
+  simulated: boolean;
+  notes?: string;
+}
+
+export interface DocumentVerifier {
+  verify(request: DocumentVerificationRequest): Promise<DocumentVerificationResult>;
+}

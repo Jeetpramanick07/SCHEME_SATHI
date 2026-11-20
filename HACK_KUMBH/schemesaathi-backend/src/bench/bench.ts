@@ -1,6 +1,7 @@
 import fs from "fs";
-import { initDb, closeDb, db } from "../db/index.js";
+import { initDb, closeDb, db, isRealPostgres } from "../db/index.js";
 import * as schema from "../db/schema.js";
+import { eq, sql } from "drizzle-orm";
 import { CatalogueService } from "../modules/catalogue/service.js";
 import { EligibilityService } from "../modules/eligibility/service.js";
 import { SchemeCompiledRules } from "../engine/types.js";
@@ -18,6 +19,16 @@ async function runBenchmark() {
   console.log(`Target scheme dataset size: ${targetCount} schemes`);
 
   await initDb();
+  const isReal = isRealPostgres();
+  const benchSchema = process.env.BENCH_SCHEMA || "schemesaathi_bench";
+
+  if (isReal) {
+    console.log(`Setting up isolated benchmark schema '${benchSchema}'...`);
+    await db.execute(sql.raw(`CREATE SCHEMA IF NOT EXISTS ${benchSchema};`));
+    await db.execute(sql.raw(`SET search_path TO ${benchSchema}, public;`));
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS ${benchSchema}.schemes (LIKE public.schemes INCLUDING ALL);`));
+    await db.execute(sql.raw(`INSERT INTO ${benchSchema}.schemes SELECT * FROM public.schemes ON CONFLICT DO NOTHING;`));
+  }
 
   // Load existing base schemes
   let samplePath = "data/government_welfare_schemes.json";
@@ -122,6 +133,8 @@ async function runBenchmark() {
           beneficiary_categories: ["BEN_001", "BEN_002"],
           status: c.status,
           accepting_applications: c.accepting_applications,
+          source: "imported",
+          verified: false,
           is_test: true,
           content_hash: `synth_hash_${c.scheme_id}`,
           version: 1,
@@ -346,6 +359,19 @@ async function runBenchmark() {
   );
   console.log("=========================================================\n");
 
+  if (isReal) {
+    console.log(`Cleaning up isolated benchmark schema '${benchSchema}'...`);
+    try {
+      await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${benchSchema} CASCADE;`));
+      await db.execute(sql.raw(`SET search_path TO public;`));
+    } catch {
+      // ignore
+    }
+  } else {
+    await db.delete(schema.schemes).where(eq(schema.schemes.is_test, true));
+  }
+  rulesCache.invalidate();
+
   await closeDb();
   const allPassed = searchP95 < 100 && dbSearchP95 < 100 && eligP95 < 500 && nextQP95 < 300;
   process.exit(allPassed ? 0 : 1);
@@ -353,6 +379,18 @@ async function runBenchmark() {
 
 runBenchmark().catch(async (err) => {
   console.error("Benchmark failed fatally:", err);
+  try {
+    const isReal = isRealPostgres();
+    const benchSchema = process.env.BENCH_SCHEMA || "schemesaathi_bench";
+    if (isReal) {
+      await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${benchSchema} CASCADE;`));
+      await db.execute(sql.raw(`SET search_path TO public;`));
+    } else {
+      await db.delete(schema.schemes).where(eq(schema.schemes.is_test, true));
+    }
+  } catch {
+    // ignore
+  }
   await closeDb();
   process.exit(1);
 });

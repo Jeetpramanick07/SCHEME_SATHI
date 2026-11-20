@@ -16,10 +16,14 @@ import {
   SchemeSchema,
   validatePrerequisitesDag,
 } from "./validator.js";
+import { ProfileSectionsService } from "../services/profile-sections.js";
+import { REJECTION_REASONS } from "../seed/rejection-reasons.js";
 
 export interface IngestOptions {
   dryRun?: boolean;
   prerequisitesPath?: string;
+  source?: "curated" | "imported" | "synthetic";
+  verified?: boolean;
 }
 
 export class IngestionPipeline {
@@ -569,7 +573,6 @@ export class IngestionPipeline {
                   help_text: r.explanation ? { en: r.explanation } : undefined,
                   review_status: "machine_drafted",
                   help_text_source: r.explanation ? "dataset" : "unverified",
-                  derived_from: `${schemeId}.eligibility.rules.${r.attribute}`,
                   status: "auto_registered",
                 })
                 .onConflictDoNothing();
@@ -598,12 +601,6 @@ export class IngestionPipeline {
                 implementing_districts: scheme.scheme_classification.implementing_districts,
               }
             : undefined,
-          area_type: geoResult.area_type || "ALL",
-          excluded_talukas: geoResult.excluded_talukas,
-          included_talukas: geoResult.included_talukas,
-          benefit_type: scheme.benefits?.benefit_type || undefined,
-          non_stackable_with: scheme.non_stackable_with,
-          benefit_cap: scheme.benefit_cap,
           resolved_district_ids: geoResult.district_ids,
           resolved_states: geoResult.states,
         });
@@ -653,6 +650,18 @@ export class IngestionPipeline {
             false
           );
 
+          const schemeSource =
+            (rawScheme as Record<string, unknown>).source !== undefined
+              ? String((rawScheme as Record<string, unknown>).source)
+              : options.source || "curated";
+
+          const schemeVerified =
+            (rawScheme as Record<string, unknown>).verified !== undefined
+              ? Boolean((rawScheme as Record<string, unknown>).verified)
+              : options.verified !== undefined
+              ? options.verified
+              : schemeSource === "curated";
+
           await db
             .insert(schema.schemes)
             .values({
@@ -675,9 +684,6 @@ export class IngestionPipeline {
               allowed_genders: compiledRules.hard_filters.allowed_genders,
               states: compiledRules.hard_filters.states,
               district_ids: compiledRules.hard_filters.district_ids,
-              area_type: geoResult.area_type || "ALL",
-              non_stackable_with: scheme.non_stackable_with || null,
-              benefit_cap: scheme.benefit_cap || null,
               benefit_type: scheme.benefits?.benefit_type,
               beneficiary_categories: scheme.overview?.beneficiary_categories,
               status: scheme.operational_status?.status || "ACTIVE",
@@ -686,6 +692,8 @@ export class IngestionPipeline {
               confidence_level: scheme.confidence_level || null,
               data_completeness: scheme.data_completeness || null,
               translation_status: translationStatusMap,
+              source: schemeSource,
+              verified: schemeVerified,
               is_test: isTest,
               content_hash: contentHash,
               version: currentVersion,
@@ -712,9 +720,6 @@ export class IngestionPipeline {
                 allowed_genders: compiledRules.hard_filters.allowed_genders,
                 states: compiledRules.hard_filters.states,
                 district_ids: compiledRules.hard_filters.district_ids,
-                area_type: geoResult.area_type || "ALL",
-                non_stackable_with: scheme.non_stackable_with || null,
-                benefit_cap: scheme.benefit_cap || null,
                 benefit_type: scheme.benefits?.benefit_type,
                 beneficiary_categories: scheme.overview?.beneficiary_categories,
                 status: scheme.operational_status?.status || "ACTIVE",
@@ -723,6 +728,8 @@ export class IngestionPipeline {
                 confidence_level: scheme.confidence_level || null,
                 data_completeness: scheme.data_completeness || null,
                 translation_status: translationStatusMap,
+                source: schemeSource,
+                verified: schemeVerified,
                 is_test: isTest,
                 content_hash: contentHash,
                 version: currentVersion,
@@ -746,6 +753,40 @@ export class IngestionPipeline {
 
     // Invalidate in-memory rules cache
     rulesCache.invalidate();
+
+    // Refresh profile sections & detect any unmapped attributes for the report
+    if (!dryRun) {
+      try {
+        const secResult = await ProfileSectionsService.seedProfileSections();
+        for (const w of secResult.warnings) {
+          issues.push({
+            severity: "warn",
+            code: "PROFILE_SECTION_UNMAPPED_ATTRIBUTES",
+            message: w,
+          });
+        }
+
+        // Seed rejection reasons taxonomy
+        for (const reason of REJECTION_REASONS) {
+          await db
+            .insert(schema.rejectionReasons)
+            .values({
+              code: reason.code,
+              text: reason.text,
+              mapped_attribute: reason.mapped_attribute,
+            })
+            .onConflictDoUpdate({
+              target: schema.rejectionReasons.code,
+              set: {
+                text: reason.text,
+                mapped_attribute: reason.mapped_attribute,
+              },
+            });
+        }
+      } catch {
+        // Proceed if custom test environment without seed file
+      }
+    }
 
     const report: IngestReport = {
       run_id: runId,

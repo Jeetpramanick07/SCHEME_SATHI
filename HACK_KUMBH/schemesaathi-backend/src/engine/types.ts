@@ -102,13 +102,10 @@ export interface SchemeCompiledRules {
   parent_scheme_id?: string;
   status: string;
   accepting_applications: string;
-  benefit_type?: string;
-  non_stackable_with?: string[];
-  benefit_cap?: {
-    max_amount?: number;
-    period?: string;
-    currency?: string;
-  };
+  source?: string;
+  verified?: boolean;
+  is_test?: boolean;
+  beneficiary_categories?: string[];
   rules: CompiledRule[];
   exclusion_rules: ExpressionNode[];
   other_conditions: ExpressionNode[];
@@ -121,8 +118,6 @@ export interface SchemeCompiledRules {
     states?: string[];
     district_ids?: string[];
     area_type?: string;
-    excluded_talukas?: string[];
-    included_talukas?: string[];
     nmc_only?: boolean;
   };
 }
@@ -132,15 +127,6 @@ export const SchemeCompiledRulesSchema = z.object({
   parent_scheme_id: z.string().optional(),
   status: z.string(),
   accepting_applications: z.string(),
-  benefit_type: z.string().optional(),
-  non_stackable_with: z.array(z.string()).optional(),
-  benefit_cap: z
-    .object({
-      max_amount: z.number().optional(),
-      period: z.string().optional(),
-      currency: z.string().optional(),
-    })
-    .optional(),
   rules: z.array(CompiledRuleSchema),
   exclusion_rules: z.array(ExpressionNodeSchema),
   other_conditions: z.array(ExpressionNodeSchema),
@@ -153,12 +139,11 @@ export const SchemeCompiledRulesSchema = z.object({
     states: z.array(z.string()).optional(),
     district_ids: z.array(z.string()).optional(),
     area_type: z.string().optional(),
-    excluded_talukas: z.array(z.string()).optional(),
-    included_talukas: z.array(z.string()).optional(),
+    nmc_only: z.boolean().optional(),
   }),
 });
 
-export type EvaluationStatus = "ELIGIBLE" | "NOT_ELIGIBLE" | "UNKNOWN";
+export type EvaluationStatus = "ELIGIBLE" | "NOT_ELIGIBLE" | "UNKNOWN" | "EXPLORE";
 
 export interface EvaluationSubject {
   member_id?: string;
@@ -186,19 +171,7 @@ export interface EvaluationContext {
   members?: EvaluationSubject[];
   approved_parent_benefits?: string[]; // IDs of approved parent schemes
   attribute_parent_mappings?: Record<string, string>; // Data-driven: attribute_key -> required_parent_scheme_id
-  district_name_by_id?: Record<string, string>; // Data-driven district mapping
-  attribute_labels?: Record<string, { en: string; hi?: string; mr?: string }>;
   language?: "en" | "hi" | "mr";
-}
-
-export interface CombinationWarning {
-  type: "NON_STACKABLE" | "BENEFIT_CAP_EXCEEDED" | "POTENTIAL_CASH_OVERLAP";
-  scheme_ids: string[];
-  message: {
-    en: string;
-    hi: string;
-    mr: string;
-  };
 }
 
 export interface UnmetCondition {
@@ -218,12 +191,32 @@ export interface MemberSchemeResult {
   scheme_id: string;
   official_name?: string;
   status: EvaluationStatus;
+  tier?: "can_apply" | "likely_confirm" | "not_eligible" | "explore";
+  can_apply?: boolean;
   seasonal: boolean;
   score: number;
   variant?: string;
   matched_pathway?: string;
   unmet: UnmetCondition[];
   unknown_attributes: string[];
+  mandatory_rules_evaluated_count?: number;
+  is_curated?: boolean;
+  is_verified?: boolean;
+  source?: string;
+  relevance_score?: number;
+  what_to_confirm?: Array<{ attribute_key: string; label: string; why_it_matters: string }>;
+  confidence_badge?: "high" | "medium" | "needs_confirmation";
+  last_verified?: string | null;
+  disclaimer_keys?: string[];
+  pre_trip_check?: {
+    bring_documents: Array<{
+      document_id: string;
+      name: string;
+      mandatory: boolean;
+      alternatives: string[];
+    }>;
+    confirm_with_office: string[];
+  };
   exclusions_hit: ExclusionHit[];
   advisories: Array<{ rule_id: string; note: string }>;
   reasons: { en: string[]; hi: string[]; mr: string[] };

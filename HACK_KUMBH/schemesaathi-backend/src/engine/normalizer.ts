@@ -13,7 +13,7 @@ export class AttributeNormalizer {
    * Examples:
    *  annual_family_income_lte_800000 -> { canonicalAttribute: 'annual_family_income', inferredOperator: 'LESS_THAN_OR_EQUAL', inferredValue: 800000, wasBaked: true }
    *  monthly_income_lte_15000 -> { canonicalAttribute: 'monthly_income', inferredOperator: 'LESS_THAN_OR_EQUAL', inferredValue: 15000, wasBaked: true }
-   *  years_in_state_gte -> { canonicalAttribute: 'years_in_state', inferredOperator: 'GREATER_THAN_OR_EQUAL', wasBaked: true }
+   *  years_in_maharashtra_gte -> { canonicalAttribute: 'years_in_maharashtra', inferredOperator: 'GREATER_THAN_OR_EQUAL', wasBaked: true }
    *  taluka_in -> { canonicalAttribute: 'taluka', inferredOperator: 'IN', wasBaked: true }
    *  marital_status_in -> { canonicalAttribute: 'marital_status', inferredOperator: 'IN', wasBaked: true }
    */

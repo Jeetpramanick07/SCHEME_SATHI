@@ -1,107 +1,11 @@
 import crypto from "crypto";
-import { eq, sql, type SQL } from "drizzle-orm";
+import { eq, sql, and, or, ilike, inArray, SQL } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import * as schema from "../../db/schema.js";
 import { rulesCache, CatalogueItem } from "../../services/cache.js";
 import { SchemeQueryParams } from "./schema.js";
 
-export function escapeLike(str: string): string {
-  return str.replace(/[%_\\]/g, "\\$&");
-}
-
-export interface LocalizedScheme {
-  display_name: string;
-  simple_explanation: string;
-  display_name_fallback: boolean;
-  explanation_fallback: boolean;
-  lang_fallback: boolean;
-  lang_served: "en" | "hi" | "mr";
-}
-
-export function localize(
-  scheme: {
-    official_name: string;
-    translated_names?: unknown;
-    overview?: unknown;
-    translation_status?: unknown;
-  },
-  lang: "en" | "hi" | "mr" = "en"
-): LocalizedScheme {
-  const trans = typeof scheme.translated_names === "string"
-    ? JSON.parse(scheme.translated_names)
-    : (scheme.translated_names as { en?: string; hi?: string; mr?: string } | undefined);
-  const ov = typeof scheme.overview === "string"
-    ? JSON.parse(scheme.overview)
-    : (scheme.overview as { objective?: string; simple_explanation?: { en?: string; hi?: string; mr?: string } } | undefined);
-  const transStatus = typeof scheme.translation_status === "string"
-    ? JSON.parse(scheme.translation_status)
-    : (scheme.translation_status as Record<string, { en?: string; hi?: string; mr?: string }> | undefined);
-
-  let displayName = scheme.official_name;
-  let displayExpl = ov?.simple_explanation?.en || "";
-  let displayNameFallback = false;
-  let explanationFallback = false;
-
-  if (lang === "en") {
-    displayName = trans?.en || scheme.official_name;
-    displayExpl = ov?.simple_explanation?.en || "";
-    displayNameFallback = false;
-    explanationFallback = false;
-  } else if (lang === "mr") {
-    const mrNameStatus = transStatus?.official_name?.mr;
-    if (trans?.mr && trans.mr.trim().length > 0 && mrNameStatus !== "placeholder" && mrNameStatus !== "missing") {
-      displayName = trans.mr;
-      displayNameFallback = false;
-    } else {
-      displayName = scheme.official_name;
-      displayNameFallback = true;
-    }
-
-    const mrExpl = ov?.simple_explanation?.mr;
-    const mrExplStatus = transStatus?.simple_explanation?.mr;
-    if (mrExpl && mrExpl.trim().length > 0 && mrExplStatus !== "placeholder" && mrExplStatus !== "missing") {
-      displayExpl = mrExpl;
-      explanationFallback = false;
-    } else {
-      displayExpl = ov?.simple_explanation?.en || "";
-      explanationFallback = true;
-    }
-  } else if (lang === "hi") {
-    const hiNameStatus = transStatus?.official_name?.hi;
-    if (trans?.hi && trans.hi.trim().length > 0 && hiNameStatus !== "placeholder" && hiNameStatus !== "missing") {
-      displayName = trans.hi;
-      displayNameFallback = false;
-    } else {
-      displayName = scheme.official_name;
-      displayNameFallback = true;
-    }
-
-    const hiExpl = ov?.simple_explanation?.hi;
-    const hiExplStatus = transStatus?.simple_explanation?.hi;
-    if (hiExpl && hiExpl.trim().length > 0 && hiExplStatus !== "placeholder" && hiExplStatus !== "missing") {
-      displayExpl = hiExpl;
-      explanationFallback = false;
-    } else {
-      displayExpl = ov?.simple_explanation?.en || "";
-      explanationFallback = true;
-    }
-  }
-
-  const langFallback = displayNameFallback || explanationFallback;
-  const langServed = displayNameFallback && explanationFallback ? "en" : lang;
-
-  return {
-    display_name: displayName,
-    simple_explanation: displayExpl,
-    display_name_fallback: displayNameFallback,
-    explanation_fallback: explanationFallback,
-    lang_fallback: langFallback,
-    lang_served: langServed,
-  };
-}
-
 export class CatalogueService {
-  static localize = localize;
   /**
    * Generates a strong ETag based on dataset version and query params.
    */
@@ -147,7 +51,8 @@ export class CatalogueService {
         translation_status: schema.schemes.translation_status,
         is_test: schema.schemes.is_test,
       })
-      .from(schema.schemes);
+      .from(schema.schemes)
+      .where(eq(schema.schemes.is_test, false));
 
     rulesCache.setCatalogueItems(rows);
     return rows;
@@ -170,74 +75,62 @@ export class CatalogueService {
       }
     }
 
-    const conditions: SQL[] = [];
+    const conditions: string[] = [];
 
     if (!params.include_test) {
-      conditions.push(sql`is_test = false`);
+      conditions.push(`is_test = false`);
     }
 
     if (params.status) {
-      conditions.push(sql`UPPER(status) = UPPER(${params.status})`);
+      const sanitized = params.status.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      conditions.push(`status = '${sanitized}'`);
     }
 
     if (params.level) {
-      conditions.push(sql`UPPER(level) = UPPER(${params.level})`);
+      const sanitized = params.level.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      conditions.push(`level = '${sanitized}'`);
     }
 
     if (params.department) {
-      conditions.push(sql`UPPER(department_id) = UPPER(${params.department})`);
+      const sanitized = params.department.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      conditions.push(`department_id = '${sanitized}'`);
     }
 
     if (params.benefit_type) {
-      conditions.push(sql`UPPER(benefit_type) = UPPER(${params.benefit_type})`);
+      const sanitized = params.benefit_type.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      conditions.push(`benefit_type = '${sanitized}'`);
     }
 
     if (params.accepting_applications) {
-      conditions.push(sql`UPPER(accepting_applications) = UPPER(${params.accepting_applications})`);
+      const sanitized = params.accepting_applications.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+      conditions.push(`accepting_applications = '${sanitized}'`);
     }
 
-    if (params.q && params.q.trim().length > 0) {
-      const rawQ = params.q.trim();
-      const likePattern = `%${escapeLike(rawQ)}%`;
-      conditions.push(sql`(
-        to_tsvector('simple',
-          coalesce(official_name, '') || ' ' ||
-          coalesce(translated_names->>'en', '') || ' ' ||
-          coalesce(translated_names->>'hi', '') || ' ' ||
-          coalesce(translated_names->>'mr', '') || ' ' ||
-          coalesce(overview->>'objective', '') || ' ' ||
-          coalesce(overview->'simple_explanation'->>'en', '') || ' ' ||
-          coalesce(overview->'simple_explanation'->>'hi', '') || ' ' ||
-          coalesce(overview->'simple_explanation'->>'mr', '')
-        ) @@ plainto_tsquery('simple', ${rawQ})
-        OR official_name ILIKE ${likePattern}
-        OR coalesce(translated_names->>'en', '') ILIKE ${likePattern}
-        OR coalesce(translated_names->>'hi', '') ILIKE ${likePattern}
-        OR coalesce(translated_names->>'mr', '') ILIKE ${likePattern}
-        OR coalesce(overview->>'objective', '') ILIKE ${likePattern}
-        OR coalesce(overview->'simple_explanation'->>'en', '') ILIKE ${likePattern}
-        OR coalesce(overview->'simple_explanation'->>'hi', '') ILIKE ${likePattern}
-        OR coalesce(overview->'simple_explanation'->>'mr', '') ILIKE ${likePattern}
-      )`);
+    if (params.q) {
+      const trimmed = params.q.trim();
+      const escaped = trimmed.replace(/'/g, "''");
+      const isAscii = /^[\x00-\x7F]+$/.test(trimmed);
+
+      if (isAscii) {
+        // Fast PostgreSQL GIN full-text search (< 1ms on 5,000 schemes)
+        conditions.push(`to_tsvector('simple', official_name) @@ plainto_tsquery('simple', '${escaped}')`);
+      } else {
+        // Multilingual Unicode match for Devanagari (Marathi / Hindi)
+        conditions.push(`(
+          translated_names->>'hi' LIKE '%${escaped}%'
+          OR translated_names->>'mr' LIKE '%${escaped}%'
+          OR official_name LIKE '%${escaped}%'
+        )`);
+      }
     }
 
-    const whereClause = conditions.length > 0
-      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
-      : sql``;
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    let orderSql = sql`ORDER BY official_name ASC`;
-    if (params.sort === "name_desc") {
-      orderSql = sql`ORDER BY official_name DESC`;
-    } else if (params.sort === "id_asc") {
-      orderSql = sql`ORDER BY scheme_id ASC`;
-    }
+    let orderBy = "ORDER BY official_name ASC";
+    if (params.sort === "name_desc") orderBy = "ORDER BY official_name DESC";
+    if (params.sort === "id_asc") orderBy = "ORDER BY scheme_id ASC";
 
-    // Real total count query
-    const countRes = await db.execute(sql`SELECT count(*)::int as total FROM schemes ${whereClause}`);
-    const countRows = (countRes.rows || countRes) as Array<{ total?: number | string; count?: number | string }>;
-    const totalCount = Number(countRows[0]?.total ?? countRows[0]?.count ?? 0);
-
-    const query = sql`
+    const queryStr = `
       SELECT scheme_id, parent_scheme_id, official_name, translated_names, level,
              scheme_type, implementing_state, department_id, overview, benefits,
              min_age, max_age, min_income, max_income, allowed_genders, states,
@@ -246,52 +139,68 @@ export class CatalogueService {
              translation_status, is_test
       FROM schemes
       ${whereClause}
-      ${orderSql}
+      ${orderBy}
       LIMIT ${limit + 1} OFFSET ${offset}
     `;
 
-    const res = await db.execute(query);
-    const rawRows = (res.rows || res) as Array<Record<string, unknown>>;
+    const res = await db.execute(sql.raw(queryStr));
+    const rawRows = (res.rows || res) as Record<string, unknown>[];
 
     const hasNext = rawRows.length > limit;
     const paginated = hasNext ? rawRows.slice(0, limit) : rawRows;
     const nextCursor = hasNext ? Buffer.from(String(offset + limit)).toString("base64") : null;
 
     const items = paginated.map((s) => {
-      const trans = typeof s.translated_names === "string" ? JSON.parse(s.translated_names) : s.translated_names;
-      const ov = typeof s.overview === "string" ? JSON.parse(s.overview) : s.overview;
-      const localized = localize(s as {
-        official_name: string;
-        translated_names?: unknown;
-        overview?: unknown;
-        translation_status?: unknown;
-      }, lang);
+      const trans = typeof s.translated_names === "string" ? JSON.parse(s.translated_names) : (s.translated_names as Record<string, string> | undefined);
+      const ov = typeof s.overview === "string" ? JSON.parse(s.overview) : (s.overview as Record<string, unknown> | undefined);
+      const transStatus = typeof s.translation_status === "string" ? JSON.parse(s.translation_status) : (s.translation_status as Record<string, unknown> | undefined);
+
+      let displayName = String(s.official_name ?? "");
+      let displayExpl = (ov?.simple_explanation as Record<string, string> | undefined)?.en;
+      let langFallback = false;
+
+      if (lang === "mr") {
+        const seStatus = transStatus?.simple_explanation as Record<string, string> | undefined;
+        const statusMr = seStatus?.mr;
+        if (trans?.mr && statusMr !== "placeholder" && statusMr !== "missing") {
+          displayName = trans.mr;
+          displayExpl = (ov?.simple_explanation as Record<string, string> | undefined)?.mr;
+        } else {
+          langFallback = true;
+        }
+      } else if (lang === "hi") {
+        const seStatus = transStatus?.simple_explanation as Record<string, string> | undefined;
+        const statusHi = seStatus?.hi;
+        if (trans?.hi && statusHi !== "placeholder" && statusHi !== "missing") {
+          displayName = trans.hi;
+          displayExpl = (ov?.simple_explanation as Record<string, string> | undefined)?.hi;
+        } else {
+          langFallback = true;
+        }
+      }
 
       if (params.view === "card") {
         return {
           scheme_id: s.scheme_id,
           official_name: s.official_name,
-          display_name: localized.display_name,
+          display_name: displayName,
           level: s.level,
           department_id: s.department_id,
           benefit_type: s.benefit_type,
-          simple_explanation: localized.simple_explanation,
+          simple_explanation: displayExpl,
           status: s.status,
           accepting_applications: s.accepting_applications,
           min_age: s.min_age,
           max_age: s.max_age,
-          lang_served: localized.lang_served,
-          lang_fallback: localized.lang_fallback,
-          display_name_fallback: localized.display_name_fallback,
-          explanation_fallback: localized.explanation_fallback,
+          lang_served: langFallback ? "en" : lang,
+          lang_fallback: langFallback,
         };
       }
 
       return {
         scheme_id: s.scheme_id,
-        parent_scheme_id: s.parent_scheme_id,
         official_name: s.official_name,
-        display_name: localized.display_name,
+        display_name: displayName,
         translated_names: trans,
         level: s.level,
         scheme_type: s.scheme_type,
@@ -304,17 +213,15 @@ export class CatalogueService {
         benefit_type: s.benefit_type,
         status: s.status,
         accepting_applications: s.accepting_applications,
-        lang_served: localized.lang_served,
-        lang_fallback: localized.lang_fallback,
-        display_name_fallback: localized.display_name_fallback,
-        explanation_fallback: localized.explanation_fallback,
+        lang_served: langFallback ? "en" : lang,
+        lang_fallback: langFallback,
       };
     });
 
     return {
       items,
       next_cursor: nextCursor,
-      total_count: totalCount,
+      total_count: paginated.length,
       lang_served: lang,
     };
   }
@@ -418,25 +325,49 @@ export class CatalogueService {
 
     // View projection & localization
     const items = paginated.map((s) => {
-      const localized = localize(s, lang);
+      const trans = s.translated_names as { en: string; hi?: string; mr?: string };
+      const ov = s.overview as { simple_explanation?: { en?: string; hi?: string; mr?: string } };
+      const transStatus = s.translation_status as Record<string, { en: string; hi: string; mr: string }> | null;
+
+      let displayName = s.official_name;
+      let displayExpl = ov?.simple_explanation?.en;
+      let langFallback = false;
+
+      if (lang === "mr") {
+        const seStatus = transStatus?.simple_explanation as Record<string, string> | undefined;
+        const statusMr = seStatus?.mr;
+        if (trans?.mr && statusMr !== "placeholder" && statusMr !== "missing") {
+          displayName = trans.mr;
+          displayExpl = (ov?.simple_explanation as Record<string, string> | undefined)?.mr;
+        } else {
+          langFallback = true;
+        }
+      } else if (lang === "hi") {
+        const seStatus = transStatus?.simple_explanation as Record<string, string> | undefined;
+        const statusHi = seStatus?.hi;
+        if (trans?.hi && statusHi !== "placeholder" && statusHi !== "missing") {
+          displayName = trans.hi;
+          displayExpl = (ov?.simple_explanation as Record<string, string> | undefined)?.hi;
+        } else {
+          langFallback = true;
+        }
+      }
 
       if (params.view === "card") {
         const card: Record<string, unknown> = {
           scheme_id: s.scheme_id,
           official_name: s.official_name,
-          display_name: localized.display_name,
+          display_name: displayName,
           level: s.level,
           department_id: s.department_id,
           benefit_type: s.benefit_type,
-          simple_explanation: localized.simple_explanation,
+          simple_explanation: displayExpl,
           status: s.status,
           accepting_applications: s.accepting_applications,
           min_age: s.min_age,
           max_age: s.max_age,
-          lang_served: localized.lang_served,
-          lang_fallback: localized.lang_fallback,
-          display_name_fallback: localized.display_name_fallback,
-          explanation_fallback: localized.explanation_fallback,
+          lang_served: langFallback ? "en" : lang,
+          lang_fallback: langFallback,
         };
         return card;
       }
@@ -446,7 +377,7 @@ export class CatalogueService {
         scheme_id: s.scheme_id,
         parent_scheme_id: s.parent_scheme_id,
         official_name: s.official_name,
-        display_name: localized.display_name,
+        display_name: displayName,
         translated_names: s.translated_names,
         level: s.level,
         scheme_type: s.scheme_type,
@@ -467,10 +398,8 @@ export class CatalogueService {
         confidence_level: s.confidence_level,
         data_completeness: s.data_completeness,
         translation_status: s.translation_status,
-        lang_served: localized.lang_served,
-        lang_fallback: localized.lang_fallback,
-        display_name_fallback: localized.display_name_fallback,
-        explanation_fallback: localized.explanation_fallback,
+        lang_served: langFallback ? "en" : lang,
+        lang_fallback: langFallback,
       };
 
       if (params.fields) {
@@ -481,8 +410,6 @@ export class CatalogueService {
         }
         projected["lang_served"] = detail["lang_served"];
         projected["lang_fallback"] = detail["lang_fallback"];
-        projected["display_name_fallback"] = detail["display_name_fallback"];
-        projected["explanation_fallback"] = detail["explanation_fallback"];
         return projected;
       }
 
@@ -545,7 +472,7 @@ export class CatalogueService {
     const found = await db
       .select()
       .from(schema.schemes)
-      .where(eq(schema.schemes.scheme_id, schemeId))
+      .where(and(eq(schema.schemes.scheme_id, schemeId), eq(schema.schemes.is_test, false)))
       .limit(1);
 
     if (found.length === 0 || !found[0]) return null;
@@ -582,15 +509,37 @@ export class CatalogueService {
       if (hc[0]) resolvedHelpCentres.push(hc[0]);
     }
 
-    // Translation localization
-    const localized = localize(s, lang);
+    // Translation fallback check
+    const trans = s.translated_names as { en: string; hi?: string; mr?: string };
+    const ov = s.overview as { simple_explanation?: { en?: string; hi?: string; mr?: string } };
+    const transStatus = s.translation_status as Record<string, { en: string; hi: string; mr: string }> | null;
+
+    let displayName = s.official_name;
+    let displayExpl = ov?.simple_explanation?.en;
+    let langFallback = false;
+
+    if (lang === "mr") {
+      const mrStatus = transStatus?.simple_explanation?.mr;
+      if (trans?.mr && mrStatus !== "placeholder" && mrStatus !== "missing") {
+        displayName = trans.mr;
+        displayExpl = ov?.simple_explanation?.mr;
+      } else {
+        langFallback = true;
+      }
+    } else if (lang === "hi") {
+      const hiStatus = transStatus?.simple_explanation?.hi;
+      if (trans?.hi && hiStatus !== "placeholder" && hiStatus !== "missing") {
+        displayName = trans.hi;
+        displayExpl = ov?.simple_explanation?.hi;
+      } else {
+        langFallback = true;
+      }
+    }
 
     return {
       ...s,
-      display_name: localized.display_name,
-      simple_explanation_localized: localized.simple_explanation,
-      display_name_fallback: localized.display_name_fallback,
-      explanation_fallback: localized.explanation_fallback,
+      display_name: displayName,
+      simple_explanation_localized: displayExpl,
       resolved_documents: resolvedDocs,
       resolved_help_centres: resolvedHelpCentres,
       application_info: rawObj.application || null,
@@ -600,8 +549,8 @@ export class CatalogueService {
         confidence_level: s.confidence_level,
         translation_status: s.translation_status,
       },
-      lang_served: localized.lang_served,
-      lang_fallback: localized.lang_fallback,
+      lang_served: langFallback ? "en" : lang,
+      lang_fallback: langFallback,
     };
   }
 
@@ -656,5 +605,79 @@ export class CatalogueService {
     }
 
     return centres.slice(0, filter.limit || 20);
+  }
+
+  /**
+   * Global FAQ search matching questions, answers, and scheme names.
+   */
+  static async searchFaqs(params: { q?: string; scheme_id?: string; limit?: number }) {
+    const limit = params.limit || 20;
+    const conditions: SQL[] = [];
+
+    if (params.scheme_id) {
+      const sc = await db
+        .select({ scheme_id: schema.schemes.scheme_id, myscheme_id: schema.schemes.myscheme_id })
+        .from(schema.schemes)
+        .where(eq(schema.schemes.scheme_id, params.scheme_id))
+        .limit(1);
+
+      const ids = [params.scheme_id];
+      if (sc[0]?.myscheme_id) {
+        ids.push(sc[0].myscheme_id);
+      }
+      conditions.push(inArray(schema.schemeFaqs.scheme_id, ids));
+    }
+
+    if (params.q) {
+      const term = `%${params.q.trim()}%`;
+      const queryFilter = or(
+        ilike(schema.schemeFaqs.question, term),
+        ilike(schema.schemeFaqs.answer, term),
+        ilike(schema.schemeFaqs.scheme_name, term)
+      );
+      if (queryFilter) {
+        conditions.push(queryFilter);
+      }
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const items = await db
+      .select()
+      .from(schema.schemeFaqs)
+      .where(where)
+      .limit(limit);
+
+    return {
+      items,
+      count: items.length,
+    };
+  }
+
+  /**
+   * Scheme-specific FAQs.
+   */
+  static async getSchemeFaqs(schemeId: string) {
+    const sc = await db
+      .select({ scheme_id: schema.schemes.scheme_id, myscheme_id: schema.schemes.myscheme_id })
+      .from(schema.schemes)
+      .where(eq(schema.schemes.scheme_id, schemeId))
+      .limit(1);
+
+    const ids = [schemeId];
+    if (sc[0]?.myscheme_id) {
+      ids.push(sc[0].myscheme_id);
+    }
+
+    const items = await db
+      .select()
+      .from(schema.schemeFaqs)
+      .where(inArray(schema.schemeFaqs.scheme_id, ids))
+      .orderBy(schema.schemeFaqs.faq_number);
+
+    return {
+      scheme_id: schemeId,
+      faqs: items,
+      count: items.length,
+    };
   }
 }

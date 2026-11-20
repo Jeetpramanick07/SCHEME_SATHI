@@ -1,11 +1,12 @@
 import fs from "fs";
-import { sql } from "drizzle-orm";
 import { initDb, closeDb, db } from "../db/index.js";
 import { runMigrations } from "../db/migrate.js";
 import * as schema from "../db/schema.js";
 import { IngestionPipeline } from "../ingest/pipeline.js";
 import { BASE_ATTRIBUTES } from "./base-attributes.js";
-import { QUESTION_BANK, QuestionBankItem } from "./question-bank.js";
+import { QUESTION_BANK, type QuestionBankItem } from "./question-bank.js";
+import { REJECTION_REASONS } from "./rejection-reasons.js";
+import { ProfileSectionsService } from "../services/profile-sections.js";
 
 async function seed() {
   console.log("Seeding SchemeSaathi backend...");
@@ -25,17 +26,13 @@ async function seed() {
           mr: base.question_text.mr || base.question_text.en,
         },
         review_status: "machine_drafted",
-        help_text_source: (base as { derived_from?: string }).derived_from ? "dataset" : "unverified",
+        help_text_source: "dataset",
       });
     }
   }
 
   console.log(`Seeding ${allAttributesToSeed.length} curated question bank attributes...`);
   for (const attr of allAttributesToSeed) {
-    const derivedFrom = attr.derived_from || null;
-    const helpTextSource = derivedFrom ? "dataset" : "unverified";
-    const reviewStatus = attr.review_status || "machine_drafted";
-
     await db
       .insert(schema.attributes)
       .values({
@@ -48,10 +45,9 @@ async function seed() {
         question_text: attr.question_text,
         help_text: attr.help_text,
         derivation: attr.derivation,
-        derived_from: derivedFrom,
         derived_from_approved_scheme: attr.derived_from_approved_scheme,
-        review_status: reviewStatus,
-        help_text_source: helpTextSource,
+        review_status: attr.review_status || "machine_drafted",
+        help_text_source: attr.help_text_source || "dataset",
         status: attr.status,
       })
       .onConflictDoUpdate({
@@ -65,17 +61,13 @@ async function seed() {
           question_text: attr.question_text,
           help_text: attr.help_text,
           derivation: attr.derivation,
-          derived_from: derivedFrom,
           derived_from_approved_scheme: attr.derived_from_approved_scheme,
-          review_status: reviewStatus,
-          help_text_source: helpTextSource,
+          review_status: attr.review_status || "machine_drafted",
+          help_text_source: attr.help_text_source || "dataset",
           status: attr.status,
         },
       });
   }
-
-  // Ensure strict integrity: default help_text_source to 'unverified' unless derived_from is explicitly defined
-  await db.execute(sql.raw("UPDATE attributes SET help_text_source = 'unverified' WHERE derived_from IS NULL;"));
 
   // 2. Identify scheme file path
   let samplePath = "data/government_welfare_schemes.json";
@@ -97,6 +89,34 @@ async function seed() {
     `Seed finished: ${report.accepted_count} schemes accepted, ${report.rejected_count} rejected, ${report.skipped_count} skipped.`
   );
   console.log(`Total reported issues: ${report.issues.length}`);
+
+  // 3. Seed rejection reasons
+  console.log("Seeding rejection reasons taxonomy...");
+  for (const reason of REJECTION_REASONS) {
+    await db
+      .insert(schema.rejectionReasons)
+      .values({
+        code: reason.code,
+        text: reason.text,
+        mapped_attribute: reason.mapped_attribute,
+      })
+      .onConflictDoUpdate({
+        target: schema.rejectionReasons.code,
+        set: {
+          text: reason.text,
+          mapped_attribute: reason.mapped_attribute,
+        },
+      });
+  }
+
+  // 4. Seed profile sections & fields
+  console.log("Seeding profile sections and fields...");
+  const secResult = await ProfileSectionsService.seedProfileSections();
+  console.log(`Seeded ${secResult.sectionsCount} sections with ${secResult.fieldsCount} fields.`);
+  if (secResult.warnings.length > 0) {
+    console.warn("Profile section seed warnings:", secResult.warnings);
+  }
+
   await closeDb();
 }
 

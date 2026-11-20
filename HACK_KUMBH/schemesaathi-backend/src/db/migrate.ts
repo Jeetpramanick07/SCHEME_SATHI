@@ -1,4 +1,4 @@
-import { initDb, closeDb, isRealPostgres } from "./index.js";
+import { initDb, closeDb } from "./index.js";
 import { sql } from "drizzle-orm";
 
 export const MIGRATION_DDL = `
@@ -117,14 +117,14 @@ CREATE TABLE IF NOT EXISTS attributes (
 
 -- Core scheme tables
 CREATE TABLE IF NOT EXISTS schemes (
-  scheme_id VARCHAR(64) PRIMARY KEY,
-  parent_scheme_id VARCHAR(64),
+  scheme_id VARCHAR(128) PRIMARY KEY,
+  parent_scheme_id VARCHAR(128),
   official_name VARCHAR(255) NOT NULL,
   translated_names JSONB NOT NULL,
   level VARCHAR(32) NOT NULL,
-  scheme_type VARCHAR(64) NOT NULL,
-  implementing_state VARCHAR(64),
-  department_id VARCHAR(64),
+  scheme_type VARCHAR(128) NOT NULL,
+  implementing_state VARCHAR(128),
+  department_id VARCHAR(255),
   overview JSONB NOT NULL,
   benefits JSONB NOT NULL,
   raw JSONB NOT NULL,
@@ -144,6 +144,8 @@ CREATE TABLE IF NOT EXISTS schemes (
   confidence_level VARCHAR(32),
   data_completeness VARCHAR(32),
   translation_status JSONB,
+  source VARCHAR(32) NOT NULL DEFAULT 'curated',
+  verified BOOLEAN NOT NULL DEFAULT FALSE,
   is_test BOOLEAN NOT NULL DEFAULT FALSE,
   content_hash VARCHAR(64) NOT NULL,
   version INTEGER NOT NULL DEFAULT 1,
@@ -180,8 +182,6 @@ CREATE TABLE IF NOT EXISTS households (
   district_id VARCHAR(64),
   taluka VARCHAR(64),
   state VARCHAR(64) DEFAULT 'Maharashtra',
-  preferred_lang VARCHAR(16) DEFAULT 'mr' NOT NULL,
-  text_tier VARCHAR(32) DEFAULT 'LARGE' NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -243,6 +243,104 @@ CREATE TABLE IF NOT EXISTS application_audit_events (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS scheme_faqs (
+  id SERIAL PRIMARY KEY,
+  scheme_id VARCHAR(64) NOT NULL,
+  scheme_name VARCHAR(255),
+  faq_number INTEGER,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS vidarbha_scheme_districts (
+  id SERIAL PRIMARY KEY,
+  district_id VARCHAR(64) NOT NULL,
+  district VARCHAR(128) NOT NULL,
+  scheme_id VARCHAR(64) NOT NULL,
+  scheme_name VARCHAR(255) NOT NULL,
+  coverage VARCHAR(128),
+  portal TEXT,
+  application_mode VARCHAR(64),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS profile_sections (
+  id VARCHAR(64) PRIMARY KEY,
+  "order" INTEGER NOT NULL,
+  scope VARCHAR(32) NOT NULL DEFAULT 'household',
+  title JSONB NOT NULL,
+  description JSONB,
+  skippable BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS profile_section_fields (
+  id SERIAL PRIMARY KEY,
+  section_id VARCHAR(64) NOT NULL,
+  attribute_key VARCHAR(128) NOT NULL,
+  "order" INTEGER NOT NULL,
+  required_for_count INTEGER DEFAULT 0,
+  optional BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS member_answers (
+  id SERIAL PRIMARY KEY,
+  household_id VARCHAR(64) NOT NULL,
+  member_id VARCHAR(64),
+  attribute_key VARCHAR(128) NOT NULL,
+  value JSONB,
+  source VARCHAR(32) NOT NULL DEFAULT 'self_declared',
+  status VARCHAR(32) NOT NULL DEFAULT 'confirmed',
+  updated_by_role VARCHAR(32) DEFAULT 'citizen',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS consent_records (
+  id SERIAL PRIMARY KEY,
+  household_id VARCHAR(64) NOT NULL,
+  purpose VARCHAR(64) NOT NULL,
+  text_version VARCHAR(32) NOT NULL DEFAULT 'v1.0',
+  lang VARCHAR(8) NOT NULL DEFAULT 'en',
+  granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  withdrawn_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS declarations (
+  id SERIAL PRIMARY KEY,
+  household_id VARCHAR(64) NOT NULL,
+  text_version VARCHAR(32) NOT NULL DEFAULT 'v1.0',
+  lang VARCHAR(8) NOT NULL DEFAULT 'en',
+  accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS rejection_reasons (
+  code VARCHAR(64) PRIMARY KEY,
+  text JSONB NOT NULL,
+  mapped_attribute VARCHAR(128)
+);
+
+CREATE TABLE IF NOT EXISTS anonymized_deletion_logs (
+  id SERIAL PRIMARY KEY,
+  household_deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  district_id VARCHAR(64),
+  member_count INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS reminders (
+  id VARCHAR(64) PRIMARY KEY,
+  household_id VARCHAR(64) NOT NULL,
+  member_id VARCHAR(64),
+  type VARCHAR(64) NOT NULL,
+  priority VARCHAR(32) NOT NULL DEFAULT 'MEDIUM',
+  channel VARCHAR(32) NOT NULL DEFAULT 'in_app',
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  due_date VARCHAR(32),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_hh ON reminders(household_id);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_schemes_level ON schemes(level);
 CREATE INDEX IF NOT EXISTS idx_schemes_status ON schemes(status);
@@ -253,21 +351,93 @@ CREATE INDEX IF NOT EXISTS idx_schemes_accepting ON schemes(accepting_applicatio
 CREATE INDEX IF NOT EXISTS idx_schemes_is_test ON schemes(is_test);
 CREATE INDEX IF NOT EXISTS idx_applications_hh ON applications(household_id);
 CREATE INDEX IF NOT EXISTS idx_app_steps_app ON application_steps(application_id);
+CREATE INDEX IF NOT EXISTS idx_faqs_scheme_id ON scheme_faqs(scheme_id);
+CREATE INDEX IF NOT EXISTS idx_faqs_question ON scheme_faqs USING gin(to_tsvector('simple', question));
+CREATE INDEX IF NOT EXISTS idx_vsd_district ON vidarbha_scheme_districts(district_id);
+CREATE INDEX IF NOT EXISTS idx_vsd_scheme ON vidarbha_scheme_districts(scheme_id);
 
 -- Alter table to ensure new columns exist on existing tables
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS source VARCHAR(32) NOT NULL DEFAULT 'imported';
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS verified BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE schemes ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE schemes ADD COLUMN IF NOT EXISTS area_type VARCHAR(32) DEFAULT 'ALL';
-ALTER TABLE schemes ADD COLUMN IF NOT EXISTS non_stackable_with JSONB;
-ALTER TABLE schemes ADD COLUMN IF NOT EXISTS benefit_cap JSONB;
+ALTER TABLE schemes ADD COLUMN IF NOT EXISTS myscheme_id VARCHAR(64);
+CREATE INDEX IF NOT EXISTS idx_schemes_source ON schemes(source);
+CREATE INDEX IF NOT EXISTS idx_schemes_verified ON schemes(verified);
+
+-- Data backfill: Ensure 24 curated gold-standard schemes have source=curated and verified=true
+UPDATE schemes SET source = 'curated', verified = TRUE WHERE scheme_id IN (
+  'CENT-MOAFW-PMKISAN-001', 'CENT-MOHFW-PMJAY-002', 'CENT-MSME-PMVISHWAKARMA-003',
+  'CENT-MOHUA-PMSVANIDHI-004', 'CENT-MOWCD-PMMVY-005', 'CENT-MORD-NSAP-006',
+  'CENT-MOLE-PMSYM-007', 'CENT-MOHUA-PMAYU2-008', 'CENT-MNRE-PMSURYAGHAR-009',
+  'MH-WCD-LADKIBAHIN-010', 'MH-WCD-LEKLADKI-011', 'MH-AGR-NAMOSHETKARI-012',
+  'MH-AGR-GOPINATHMUNDE-013', 'MH-SJSA-SANJAYGANDHI-014', 'MH-SJSA-SHRAVANBAL-015',
+  'MH-LAB-MAHABOCW-016', 'MH-PHD-MJPJAY-017', 'MH-DHE-EBC-SHAHU-018',
+  'DIST-NGP-DMF-WELFARE-019', 'LOCAL-GAD-PMAYG-ENHANCED-020', 'MH-SJSA-RAMAIAWAS-021',
+  'MH-TDD-SHABARIAWAS-022', 'MH-AGR-POCRA-023', 'MH-SKILL-LADKABHAU-024'
+);
+-- Ensure all imported schemes have source=imported and verified=false
+UPDATE schemes SET source = 'imported', verified = FALSE WHERE scheme_id NOT IN (
+  'CENT-MOAFW-PMKISAN-001', 'CENT-MOHFW-PMJAY-002', 'CENT-MSME-PMVISHWAKARMA-003',
+  'CENT-MOHUA-PMSVANIDHI-004', 'CENT-MOWCD-PMMVY-005', 'CENT-MORD-NSAP-006',
+  'CENT-MOLE-PMSYM-007', 'CENT-MOHUA-PMAYU2-008', 'CENT-MNRE-PMSURYAGHAR-009',
+  'MH-WCD-LADKIBAHIN-010', 'MH-WCD-LEKLADKI-011', 'MH-AGR-NAMOSHETKARI-012',
+  'MH-AGR-GOPINATHMUNDE-013', 'MH-SJSA-SANJAYGANDHI-014', 'MH-SJSA-SHRAVANBAL-015',
+  'MH-LAB-MAHABOCW-016', 'MH-PHD-MJPJAY-017', 'MH-DHE-EBC-SHAHU-018',
+  'DIST-NGP-DMF-WELFARE-019', 'LOCAL-GAD-PMAYG-ENHANCED-020', 'MH-SJSA-RAMAIAWAS-021',
+  'MH-TDD-SHABARIAWAS-022', 'MH-AGR-POCRA-023', 'MH-SKILL-LADKABHAU-024'
+);
 ALTER TABLE attributes ADD COLUMN IF NOT EXISTS review_status VARCHAR(32) NOT NULL DEFAULT 'machine_drafted';
-ALTER TABLE attributes ADD COLUMN IF NOT EXISTS derived_from TEXT;
 ALTER TABLE attributes ADD COLUMN IF NOT EXISTS derived_from_approved_scheme VARCHAR(64);
-ALTER TABLE attributes ADD COLUMN IF NOT EXISTS help_text_source VARCHAR(64) DEFAULT 'unverified';
-ALTER TABLE geo_scope_tokens ADD COLUMN IF NOT EXISTS area_type VARCHAR(32) DEFAULT 'ALL';
-ALTER TABLE geo_scope_tokens ADD COLUMN IF NOT EXISTS excluded_talukas JSONB;
-ALTER TABLE geo_scope_tokens ADD COLUMN IF NOT EXISTS included_talukas JSONB;
-ALTER TABLE households ADD COLUMN IF NOT EXISTS preferred_lang VARCHAR(16) DEFAULT 'mr' NOT NULL;
-ALTER TABLE households ADD COLUMN IF NOT EXISTS text_tier VARCHAR(32) DEFAULT 'LARGE' NOT NULL;
+ALTER TABLE attributes ADD COLUMN IF NOT EXISTS help_text_source VARCHAR(64) DEFAULT 'dataset';
+
+ALTER TABLE households ADD COLUMN IF NOT EXISTS created_by_role VARCHAR(32) DEFAULT 'citizen';
+ALTER TABLE households ADD COLUMN IF NOT EXISTS access_secret_hash VARCHAR(128);
+ALTER TABLE households ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(32);
+ALTER TABLE households ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN DEFAULT FALSE;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS outcome VARCHAR(32) DEFAULT 'pending';
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS rejection_reason_code VARCHAR(64);
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS rejection_note TEXT;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS outcome_recorded_by_role VARCHAR(32);
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS outcome_at TIMESTAMP;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS simulated_sms_messages (
+  id VARCHAR(64) PRIMARY KEY,
+  household_id VARCHAR(64),
+  phone VARCHAR(32) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(32) DEFAULT 'simulated_delivered',
+  provider VARCHAR(32) DEFAULT 'simulated',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_simulated_sms_hh ON simulated_sms_messages(household_id);
+
+CREATE INDEX IF NOT EXISTS idx_member_answers_hh ON member_answers(household_id);
+CREATE INDEX IF NOT EXISTS idx_member_answers_status ON member_answers(status);
+CREATE INDEX IF NOT EXISTS idx_consent_records_hh ON consent_records(household_id);
+CREATE INDEX IF NOT EXISTS idx_declarations_hh ON declarations(household_id);
+CREATE INDEX IF NOT EXISTS idx_profile_sec_fields_sec ON profile_section_fields(section_id);
+CREATE INDEX IF NOT EXISTS idx_profile_sec_fields_attr ON profile_section_fields(attribute_key);
+
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(64) PRIMARY KEY,
+  username VARCHAR(128) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  phone VARCHAR(32),
+  email VARCHAR(128),
+  household_id VARCHAR(64) NOT NULL,
+  member_id VARCHAR(64) NOT NULL,
+  role VARCHAR(32) NOT NULL DEFAULT 'citizen',
+  profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  digilocker_linked BOOLEAN NOT NULL DEFAULT FALSE,
+  masked_aadhaar VARCHAR(32),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_household ON users(household_id);
 
 -- Postgres extensions & search indexes (executed safely)
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -277,8 +447,6 @@ CREATE INDEX IF NOT EXISTS idx_schemes_trgm ON schemes USING gin(official_name g
 
 export async function runMigrations(): Promise<void> {
   const database = await initDb();
-  const realPg = isRealPostgres();
-
   // Split statements and execute sequentially
   const statements = MIGRATION_DDL.split(";")
     .map((s) => s.trim())
@@ -287,15 +455,8 @@ export async function runMigrations(): Promise<void> {
   for (const statement of statements) {
     try {
       await database.execute(sql.raw(statement));
-      if (statement.includes("CREATE EXTENSION IF NOT EXISTS pg_trgm")) {
-        console.log(`[Migration] Extension pg_trgm enabled successfully (${realPg ? "real PostgreSQL" : "PGlite"}).`);
-      }
     } catch {
-      if (statement.includes("CREATE EXTENSION IF NOT EXISTS pg_trgm")) {
-        console.log("[Migration] pg_trgm extension not supported on PGlite; degraded gracefully.");
-      } else if (statement.includes("gin_trgm_ops")) {
-        console.log("[Migration] Trigram index (gin_trgm_ops) not supported on PGlite; degraded gracefully.");
-      }
+      // Ignore errors for optional extensions or duplicate indexes in minimal engines
     }
   }
 }

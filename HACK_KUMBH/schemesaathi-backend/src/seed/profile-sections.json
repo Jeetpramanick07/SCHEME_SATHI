@@ -1,0 +1,196 @@
+[
+  {
+    "id": "personal",
+    "order": 1,
+    "scope": "member",
+    "title": {
+      "en": "Personal Information",
+      "hi": "व्यक्तिगत जानकारी",
+      "mr": "वैयक्तिक माहिती"
+    },
+    "description": {
+      "en": "Basic personal details such as age, gender, and marital status",
+      "hi": "मूलभूत व्यक्तिगत विवरण जैसे आयु, लिंग और वैवाहिक स्थिति",
+      "mr": "वय, लिंग आणि वैवाहिक स्थिती यांसारखे मूलभूत वैयक्तिक तपशील"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "age", "order": 1, "optional": true },
+      { "attribute_key": "gender", "order": 2, "optional": true },
+      { "attribute_key": "marital_status", "order": 3, "optional": true },
+      { "attribute_key": "caste_category", "order": 4, "optional": true },
+      { "attribute_key": "religion", "order": 5, "optional": true },
+      { "attribute_key": "minority_status", "order": 6, "optional": true },
+      { "attribute_key": "education_level", "order": 7, "optional": true }
+    ]
+  },
+  {
+    "id": "family",
+    "order": 2,
+    "scope": "household",
+    "title": {
+      "en": "Family & Household Details",
+      "hi": "परिवार और घरेलू विवरण",
+      "mr": "कुटुंब आणि घरगुती तपशील"
+    },
+    "description": {
+      "en": "Information about family composition and dependants",
+      "hi": "परिवार के सदस्यों और आश्रितों की जानकारी",
+      "mr": "कुटुंबाची रचना आणि अवलंबून असणाऱ्यांची माहिती"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "family_size", "order": 1, "optional": true },
+      { "attribute_key": "is_widow", "order": 2, "optional": true },
+      { "attribute_key": "is_orphan", "order": 3, "optional": true },
+      { "attribute_key": "num_children", "order": 4, "optional": true },
+      { "attribute_key": "girl_children_count", "order": 5, "optional": true },
+      { "attribute_key": "single_woman_household", "order": 6, "optional": true }
+    ]
+  },
+  {
+    "id": "address_and_area",
+    "order": 3,
+    "scope": "household",
+    "title": {
+      "en": "Address & Geographic Area",
+      "hi": "पता और भौगोलिक क्षेत्र",
+      "mr": "पत्ता आणि भौगोलिक क्षेत्र"
+    },
+    "description": {
+      "en": "Where you live, rural/urban setting, and residence duration",
+      "hi": "आप कहाँ रहते हैं, ग्रामीण/शहरी क्षेत्र और निवास की अवधि",
+      "mr": "तुम्ही कुठे राहता, ग्रामीण/शहरी भाग आणि वास्तव्याचा कालावधी"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "residence_state", "order": 1, "optional": true },
+      { "attribute_key": "district", "order": 2, "optional": true },
+      { "attribute_key": "taluka", "order": 3, "optional": true },
+      { "attribute_key": "area_type", "order": 4, "optional": true },
+      { "attribute_key": "years_in_maharashtra_gte", "order": 5, "optional": true },
+      { "attribute_key": "urban_slum", "order": 6, "optional": true },
+      { "attribute_key": "nmc_resident", "order": 7, "optional": true }
+    ]
+  },
+  {
+    "id": "occupation_and_land",
+    "order": 4,
+    "scope": "member",
+    "title": {
+      "en": "Occupation & Land Ownership",
+      "hi": "व्यवसाय और भूमि स्वामित्व",
+      "mr": "व्यवसाय आणि जमीन धारणा"
+    },
+    "description": {
+      "en": "Your work type, farmer category, and cultivable landholding",
+      "hi": "आपके काम का प्रकार, किसान श्रेणी और खेती की जमीन",
+      "mr": "तुमचा कामाचा प्रकार, शेतकरी वर्ग आणि शेतजमीन"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "occupation", "order": 1, "optional": true },
+      { "attribute_key": "farmer_type", "order": 2, "optional": true },
+      { "attribute_key": "owns_cultivable_land", "order": 3, "optional": true },
+      { "attribute_key": "landholding_hectares", "order": 4, "optional": true },
+      { "attribute_key": "dryland_hectares", "order": 5, "optional": true },
+      { "attribute_key": "is_unorganised_worker", "order": 6, "optional": true },
+      { "attribute_key": "is_construction_worker", "order": 7, "optional": true },
+      { "attribute_key": "is_street_vendor", "order": 8, "optional": true },
+      { "attribute_key": "artisan_craftsman", "order": 9, "optional": true }
+    ]
+  },
+  {
+    "id": "income_and_cards",
+    "order": 5,
+    "scope": "household",
+    "title": {
+      "en": "Income & Ration Cards",
+      "hi": "आय और राशन कार्ड",
+      "mr": "उत्पन्न आणि रेशन कार्ड"
+    },
+    "description": {
+      "en": "Annual and monthly income, BPL status, and ration card details",
+      "hi": "वार्षिक व मासिक आय, बीपीएल स्थिति और राशन कार्ड विवरण",
+      "mr": "वार्षिक आणि मासिक उत्पन्न, बीपीएल स्थिती आणि रेशन कार्ड तपशील"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "annual_family_income", "order": 1, "optional": true },
+      { "attribute_key": "monthly_income", "order": 2, "optional": true },
+      { "attribute_key": "belongs_to_bpl_household", "order": 3, "optional": true },
+      { "attribute_key": "ration_card_type", "order": 4, "optional": true },
+      { "attribute_key": "income_tax_payer", "order": 5, "optional": true },
+      { "attribute_key": "government_employee_in_family", "order": 6, "optional": true }
+    ]
+  },
+  {
+    "id": "health_and_disability",
+    "order": 6,
+    "scope": "member",
+    "title": {
+      "en": "Health & Disability",
+      "hi": "स्वास्थ्य और दिव्यांगता",
+      "mr": "आरोग्य आणि दिव्यांगत्व"
+    },
+    "description": {
+      "en": "Disability certification percentage and maternal health status",
+      "hi": "दिव्यांगता प्रतिशत और मातृ स्वास्थ्य स्थिति",
+      "mr": "दिव्यांगत्व टक्केवारी आणि मातृ आरोग्य स्थिती"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "disability_percentage", "order": 1, "optional": true },
+      { "attribute_key": "is_differently_abled", "order": 2, "optional": true },
+      { "attribute_key": "disability_type", "order": 3, "optional": true },
+      { "attribute_key": "is_pregnant_or_lactating", "order": 4, "optional": true },
+      { "attribute_key": "chronic_illness", "order": 5, "optional": true }
+    ]
+  },
+  {
+    "id": "documents_held",
+    "order": 7,
+    "scope": "household",
+    "title": {
+      "en": "Documents Held",
+      "hi": "उपलब्ध दस्तावेज",
+      "mr": "उपलब्ध कागदपत्रे"
+    },
+    "description": {
+      "en": "Official identity cards, bank accounts, and certificates in possession",
+      "hi": "उपलब्ध पहचान पत्र, बैंक खाता और प्रमाण पत्र",
+      "mr": "उपलब्ध ओळखपत्रे, बँक खाते आणि प्रमाणपत्रे"
+    },
+    "skippable": true,
+    "fields": [
+      { "attribute_key": "has_aadhaar", "order": 1, "optional": true },
+      { "attribute_key": "has_bank_account", "order": 2, "optional": true },
+      { "attribute_key": "has_aadhaar_linked_bank", "order": 3, "optional": true },
+      { "attribute_key": "has_domicile_certificate", "order": 4, "optional": true },
+      { "attribute_key": "has_income_certificate", "order": 5, "optional": true },
+      { "attribute_key": "has_caste_certificate", "order": 6, "optional": true },
+      { "attribute_key": "has_disability_certificate", "order": 7, "optional": true },
+      { "attribute_key": "has_pm_kisan_approval", "order": 8, "optional": true }
+    ]
+  },
+  {
+    "id": "declaration",
+    "order": 8,
+    "scope": "household",
+    "title": {
+      "en": "Declaration & Consent",
+      "hi": "घोषणा एवं सहमति",
+      "mr": "हमीपत्र आणि संमती"
+    },
+    "description": {
+      "en": "Confirmation of true answers and understanding of scheme suggestion scope",
+      "hi": "सही जानकारी की पुष्टि और योजना सुझाव के दायरे की सहमति",
+      "mr": "माहितीच्या सत्यतेची खात्री आणि योजना शिफारशींच्या अटींची संमती"
+    },
+    "skippable": false,
+    "fields": [
+      { "attribute_key": "declaration_accepted", "order": 1, "optional": false },
+      { "attribute_key": "consent_data_processing", "order": 2, "optional": false }
+    ]
+  }
+]

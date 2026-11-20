@@ -10,9 +10,6 @@ export interface DistrictRecord {
 export interface GeoResolutionResult {
   district_ids: string[];
   states: string[];
-  area_type?: "URBAN" | "RURAL" | "ALL";
-  excluded_talukas?: string[];
-  included_talukas?: string[];
   issues: ValidationIssue[];
 }
 
@@ -20,9 +17,6 @@ export interface GeoScopeTokenDefinition {
   token: string;
   states: string[];
   description: string;
-  area_type?: "URBAN" | "RURAL" | "ALL";
-  excluded_talukas?: string[];
-  included_talukas?: string[];
   resolveDistricts: (districts: DistrictRecord[]) => string[];
 }
 
@@ -31,28 +25,24 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "ALL_INDIA",
     states: ["ALL_INDIA"],
     description: "All districts and territories nationwide across India",
-    area_type: "ALL",
     resolveDistricts: (districts) => districts.map((d) => d.district_id),
   },
   {
     token: "CENTRAL",
     states: ["ALL_INDIA"],
     description: "Central government scheme implementing nationwide",
-    area_type: "ALL",
     resolveDistricts: (districts) => districts.map((d) => d.district_id),
   },
   {
     token: "ALL_INDIA_URBAN",
     states: ["ALL_INDIA"],
     description: "All Statutory Towns and Urban Local Bodies (ULBs) across India",
-    area_type: "URBAN",
     resolveDistricts: (districts) => districts.map((d) => d.district_id),
   },
   {
     token: "ALL_36_MAHARASHTRA_DISTRICTS",
     states: ["Maharashtra"],
     description: "All 36 administrative districts in Maharashtra State",
-    area_type: "ALL",
     resolveDistricts: (districts) =>
       districts
         .filter((d) => d.state.toLowerCase() === "maharashtra")
@@ -62,7 +52,6 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "MAHARASHTRA",
     states: ["Maharashtra"],
     description: "State-wide Maharashtra jurisdiction",
-    area_type: "ALL",
     resolveDistricts: (districts) =>
       districts
         .filter((d) => d.state.toLowerCase() === "maharashtra")
@@ -72,7 +61,6 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "VIDARBHA_ALL_11",
     states: ["Maharashtra"],
     description: "All 11 districts of the Vidarbha region, Maharashtra",
-    area_type: "ALL",
     resolveDistricts: (districts) =>
       districts.filter((d) => d.is_vidarbha).map((d) => d.district_id),
   },
@@ -80,7 +68,6 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "VIDARBHA",
     states: ["Maharashtra"],
     description: "All 11 districts of Vidarbha region",
-    area_type: "ALL",
     resolveDistricts: (districts) =>
       districts.filter((d) => d.is_vidarbha).map((d) => d.district_id),
   },
@@ -88,7 +75,6 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "VIDARBHA_ULBS",
     states: ["Maharashtra"],
     description: "All Urban Local Bodies (Municipal Corporations, Councils) across Vidarbha districts",
-    area_type: "URBAN",
     resolveDistricts: (districts) =>
       districts.filter((d) => d.is_vidarbha).map((d) => d.district_id),
   },
@@ -96,9 +82,6 @@ export const BUILTIN_GEO_TOKENS: GeoScopeTokenDefinition[] = [
     token: "NAGPUR_NMC_10_ZONES",
     states: ["Maharashtra"],
     description: "Nagpur Municipal Corporation (NMC) jurisdiction across all 10 municipal zones in Nagpur district",
-    area_type: "URBAN",
-    excluded_talukas: ["KATOL", "NARKHED", "SAONER", "RAMTEK", "MOUDA", "UMRED", "KUHI", "BHIWAPUR", "HINGNA", "PARSEONI"],
-    included_talukas: ["NAGPUR", "NAGPUR_URBAN", "NMC"],
     resolveDistricts: (districts) => {
       const ngp = districts.find(
         (d) => d.district_id === "DIST_MH_NGP" || d.district_name.toLowerCase() === "nagpur"
@@ -127,9 +110,6 @@ export class GeoScopeResolver {
     const issues: ValidationIssue[] = [];
     const resolvedDistricts = new Set<string>();
     const resolvedStates = new Set<string>();
-    let resolvedAreaType: "URBAN" | "RURAL" | "ALL" = "ALL";
-    const resolvedExcludedTalukas = new Set<string>();
-    const resolvedIncludedTalukas = new Set<string>();
 
     // 1. Process State Token
     let stateTokenDef: GeoScopeTokenDefinition | undefined = undefined;
@@ -139,9 +119,6 @@ export class GeoScopeResolver {
       stateTokenDef = this.tokenMap.get(upperState);
       if (stateTokenDef) {
         for (const st of stateTokenDef.states) resolvedStates.add(st);
-        if (stateTokenDef.area_type && stateTokenDef.area_type !== "ALL") {
-          resolvedAreaType = stateTokenDef.area_type;
-        }
       } else {
         resolvedStates.add(trimmedState);
       }
@@ -162,15 +139,6 @@ export class GeoScopeResolver {
           for (const st of tokenDef.states) resolvedStates.add(st);
           const matchedDistIds = tokenDef.resolveDistricts(this.districts);
           for (const dId of matchedDistIds) resolvedDistricts.add(dId);
-          if (tokenDef.area_type && tokenDef.area_type !== "ALL") {
-            resolvedAreaType = tokenDef.area_type;
-          }
-          if (tokenDef.excluded_talukas) {
-            for (const t of tokenDef.excluded_talukas) resolvedExcludedTalukas.add(t);
-          }
-          if (tokenDef.included_talukas) {
-            for (const t of tokenDef.included_talukas) resolvedIncludedTalukas.add(t);
-          }
           continue;
         }
 
@@ -211,9 +179,6 @@ export class GeoScopeResolver {
     return {
       district_ids: Array.from(resolvedDistricts),
       states: Array.from(resolvedStates),
-      area_type: resolvedAreaType,
-      excluded_talukas: resolvedExcludedTalukas.size > 0 ? Array.from(resolvedExcludedTalukas) : undefined,
-      included_talukas: resolvedIncludedTalukas.size > 0 ? Array.from(resolvedIncludedTalukas) : undefined,
       issues,
     };
   }

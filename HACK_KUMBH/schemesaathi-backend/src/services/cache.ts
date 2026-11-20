@@ -29,9 +29,21 @@ export interface CatalogueItem {
   is_test?: boolean | null;
 }
 
+export interface SchemeNameMeta {
+  official_name: string;
+  translated_names: unknown;
+  translation_status: unknown;
+  confidence_level?: string | null;
+  last_verified?: string | null;
+  raw?: unknown;
+}
+
 class RulesCacheService {
   private cache = new Map<string, SchemeCompiledRules>();
   private catalogueCache: CatalogueItem[] | null = null;
+  private namesMap: Map<string, SchemeNameMeta> | null = null;
+  private parentMappings: Record<string, string> | null = null;
+  private attributeRegistry: unknown = null;
   private datasetVersion = "v0";
   private lastLoadedAt: number | null = null;
 
@@ -68,9 +80,36 @@ class RulesCacheService {
     this.catalogueCache = items;
   }
 
+  getNamesMap(): Map<string, SchemeNameMeta> | null {
+    return this.namesMap;
+  }
+
+  setNamesMap(map: Map<string, SchemeNameMeta>): void {
+    this.namesMap = map;
+  }
+
+  getParentMappings(): Record<string, string> | null {
+    return this.parentMappings;
+  }
+
+  setParentMappings(mappings: Record<string, string>): void {
+    this.parentMappings = mappings;
+  }
+
+  getAttributeRegistry<T>(): T | null {
+    return this.attributeRegistry as T | null;
+  }
+
+  setAttributeRegistry(reg: unknown): void {
+    this.attributeRegistry = reg;
+  }
+
   invalidate(): void {
     this.cache.clear();
     this.catalogueCache = null;
+    this.namesMap = null;
+    this.parentMappings = null;
+    this.attributeRegistry = null;
     this.datasetVersion = `v_${Date.now()}`;
     this.lastLoadedAt = null;
   }

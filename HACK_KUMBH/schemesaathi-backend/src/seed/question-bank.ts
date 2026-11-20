@@ -16,7 +16,6 @@ export interface QuestionBankItem {
     mr?: string;
   };
   derivation?: string;
-  derived_from?: string;
   derived_from_approved_scheme?: string;
   review_status?: "machine_drafted" | "reviewed";
   help_text_source?: "dataset" | "unverified";
@@ -40,8 +39,7 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम आवास शहरी और दीनदयाल अंत्योदय जैसी योजनाएं केवल शहरी व स्लम क्षेत्रों के लिए हैं।",
       mr: "पीएम आवास शहरी आणि दीनदयाल अंत्योदय यांसारख्या योजना केवळ नागरी व झोपडपट्टी भागांसाठी आहेत.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHUA-PMAYU2-008.scheme_classification.implementing_districts",
+    review_status: "machine_drafted",
     help_text_source: "dataset",
     status: "curated",
   },
@@ -63,9 +61,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       mr: "तुमच्या आधार कार्ड किंवा मतदान ओळखपत्रावर नोंदवलेले पूर्ण वय लिहा.",
     },
     derivation: "derived from date_of_birth where available",
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.minimum_age",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -84,9 +79,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सरकारी दस्तावेजों के अनुसार अपना लिंग चुनें।",
       mr: "सरकारी कागदपत्रांनुसार तुमचे लिंग निवडा.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.gender_restrictions",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -105,9 +97,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "विधवा, तलाकशुदा या निराधार महिलाओं को विशेष पेंशन और सहायता योजनाओं का लाभ मिलता है।",
       mr: "विधवा, घटस्फोटित किंवा निराधार महिलांना विशेष पेन्शन व शासकीय योजनांचा लाभ मिळतो.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.rules.marital_status_in",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -126,9 +115,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       mr: "जर पतीचे निधन झाले असेल आणि आपण पुनर्विवाह केलेला नसेल तर 'होय' निवडा.",
     },
     derivation: "derived from marital_status == 'WIDOW'",
-      review_status: "machine_drafted",
-    derived_from: "CENT-MORD-NSAP-006.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -147,9 +133,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "तहसीलदार द्वारा जारी आय प्रमाण पत्र (Income Certificate) पर लिखी कुल राशि दर्ज करें।",
       mr: "तहसीलदारांच्या उत्पन्नाच्या दाखल्यावर नमूद केलेली कुटुंबाची एकूण वार्षिक रक्कम टाका.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHUA-PMAYU2-008.eligibility.rules.annual_family_income",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -168,9 +151,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम-श्रम योगी मानधन जैसी योजनाओं के लिए मासिक आय ₹15,000 या उससे कम होनी चाहिए।",
       mr: "पीएम श्रमयोगी मानधनसारख्या योजनांसाठी मासिक उत्पन्न ₹१५,००० किंवा त्यापेक्षा कमी असणे आवश्यक आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOLE-PMSYM-007.eligibility.rules.monthly_income_lte_15000",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -188,9 +168,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "उस राज्य का नाम बताएं जहां आपका परिवार रहता है और राशन कार्ड या आधार कार्ड है।",
       mr: "ज्या राज्यात तुमचे कुटुंब राहते व ज्या ठिकाणचे रेशन किंवा आधार कार्ड आहे ते राज्य निवडा.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.scheme_classification.implementing_state",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -208,9 +185,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "अपने जिले का नाम चुनें (जैसे: नागपुर, वर्धा, गढ़चिरोली, अमरावती)।",
       mr: "तुमचा जिल्हा निवडा (उदा. नागपूर, वर्धा, गडचिरोली, अमरावती इत्यादी).",
     },
-      review_status: "machine_drafted",
-    derived_from: "DIST-NGP-DMF-WELFARE-019.scheme_classification.implementing_districts",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -228,9 +202,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "उदाहरण के लिए: नागपुर जिले में सावनेर, पारशिवनी, कामठी, रामटेक, उमरेड, कुही।",
       mr: "उदा. नागपूर जिल्ह्यातील सावनेर, पारशिवनी, कामठी, रामटेक, उमरेड, कुही इत्यादी.",
     },
-      review_status: "machine_drafted",
-    derived_from: "DIST-NGP-DMF-WELFARE-019.eligibility.rules.taluka_in",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -249,9 +220,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "महाराष्ट्र सरकार की योजनाओं (जैसे श्रावणबाळ योजना) के लिए कम से कम 15 वर्ष का निवास आवश्यक है।",
       mr: "महाराष्ट्र शासनाच्या योजनांसाठी (उदा. श्रावणबाळ योजना) किमान १५ वर्षे महाराष्ट्रात राहणे आवश्यक असते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SJSA-SANJAYGANDHI-014.eligibility.rules.years_in_maharashtra_gte",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -270,9 +238,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "रमाई आवास योजना अनुसूचित जाति (SC)/नवबौद्ध के लिए और शबरी आवास योजना अनुसूचित जनजाति (ST) के लिए है।",
       mr: "रमाई घरकुल योजना अनुसूचित जाती (SC)/नवबौद्ध प्रवर्गासाठी तर शबरी घरकुल योजना ST प्रवर्गासाठी आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SJSA-RAMAIAWAS-021.eligibility.rules.social_category",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -290,9 +255,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सीएम-कार्य प्रशिक्षण योजना के लिए कम से कम 12वीं पास, आईटीआई, डिप्लोमा या स्नातक होना आवश्यक है।",
       mr: "लाडका भाऊ (सीएम कार्य प्रशिक्षण) योजनेसाठी किमान १२ वी उत्तीर्ण, आयटीआय किंवा पदवी आवश्यक आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SKILL-LADKABHAU-024.eligibility.rules.education_level",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -310,9 +272,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "यदि आप नौकरी या काम की तलाश में हैं और कोई पक्की नौकरी नहीं है, तो 'बेरोजगार' चुनें।",
       mr: "जर तुमच्याकडे सध्या नोकरी नसेल आणि तुम्ही प्रशिक्षणाच्या शोधात असाल तर 'बेरोजगार' निवडा.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SKILL-LADKABHAU-024.eligibility.rules.employment_status",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -329,9 +288,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "जैसे: किसान, खेत मजदूर, निर्माण मजदूर, पथविक्रेता (फेरीवाला), बढ़ई, दर्जी।",
       mr: "उदा. शेतकरी, शेतमजूर, बांधकाम कामगार, फेरीवाला, सुतार, शिंपी इत्यादी.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MSME-PMVISHWAKARMA-003.eligibility.eligible_occupations",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -349,9 +305,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "बीपीएल परिवारों को वृद्धावस्था पेंशन (इंदिरा गांधी/श्रावणबाळ) और विशेष योजनाओं में प्राथमिकता मिलती है।",
       mr: "दारिद्र्यरेषेखालील कुटुंबांना श्रावणबाळ व इंदिरा गांधी पेन्शन योजनेमध्ये थेट प्राधान्य मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MORD-NSAP-006.eligibility.rules.belongs_to_bpl_household",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -370,9 +323,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीला और केसरी राशन कार्ड धारक महात्मा फुले जन आरोग्य और लाड़की बहिन योजना के पात्र होते हैं।",
       mr: "पिवळे आणि केशरी रेशन कार्डधारक महात्मा जोतिराव फुले जन आरोग्य आणि लाडकी बहीण योजनेस पात्र ठरतात.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LEKLADKI-011.eligibility.rules.ration_card_type_in",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -390,9 +340,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम किसान और नमो शेतकरी महासन्मान निधि के लिए नाम पर कृषि भूमि होना अनिवार्य है।",
       mr: "पीएम किसान आणि नमो शेतकरी महासन्मान निधीसाठी स्वतःच्या नावावर शेतजमीन असणे आवश्यक आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.rules.owns_cultivable_land",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -411,9 +358,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "1 हेक्टेयर लगभग 2.5 एकड़ के बराबर होता है। छोटे व सीमांत किसानों के पास 5 एकड़ से कम जमीन होती है।",
       mr: "१ हेक्टर म्हणजे साधारण २.५ एकर. लहान व अल्पभूधारक शेतकऱ्यांकडे ५ एकरांपर्यंत जमीन असते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-POCRA-023.eligibility.rules.land_holding_hectares",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -431,9 +375,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम किसान योजना का लाभ पाने के लिए डिजिटल 7/12 पर नाम होना अनिवार्य है।",
       mr: "पीएम किसान योजनेच्या लाभासाठी अधिकृत डिजिटल ७/१२ उताऱ्यावर नाव असणे अनिवार्य आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.rules.land_recorded_in_state_ror",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -451,9 +392,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सरकारी आवास योजनाएं (पीएम आवास, रमाई, शबरी) केवल उन परिवारों के लिए हैं जिनके पास पक्का मकान नहीं है।",
       mr: "शासकीय घरकुल योजना (पीएम आवास, रमाई, शबरी) फक्त कच्च्या घरात राहणाऱ्या कुटुंबांसाठी आहेत.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHUA-PMAYU2-008.eligibility.rules.owns_pucca_house_anywhere_in_india",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -471,9 +409,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम सूर्य घर योजना के तहत छत पर सोलर पैनल लगाने के लिए उपयुक्त छत होना आवश्यक है।",
       mr: "पीएम सूर्य घर मोफत वीज योजनेसाठी छतावर सौर यंत्रणा बसवण्यायोग्य जागा आवश्यक असते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MNRE-PMSURYAGHAR-009.eligibility.rules.owns_residential_house_with_roof",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -491,9 +426,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सोलर सब्सिडी पाने के लिए बिजली बिल पर लिखा उपभोक्ता क्रमांक (Consumer No.) आवश्यक है।",
       mr: "सौर अनुदानासाठी वीज बिलावरील ग्राहक क्रमांक (Consumer No.) आवश्यक असतो.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MNRE-PMSURYAGHAR-009.eligibility.rules.has_valid_domestic_discom_electricity_connection",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -511,9 +443,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सरकारी योजनाओं का पैसा सीधे आपके बैंक खाते में भेजा जाता है।",
       mr: "शासकीय योजनांचे अनुदान थेट लाभ हस्तांतरणाद्वारे (DBT) बँक खात्यात जमा केले जाते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOLE-PMSYM-007.eligibility.rules.has_savings_bank_account",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -531,9 +460,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सरकारी लाभ बिना रुकावट पाने के लिए बैंक खाते में आधार लिंक होना जरूरी है।",
       mr: "योजनेचे पैसे थेट खात्यात जमा होण्यासाठी बँक खात्याला आधार लिंक असणे गरजेचे आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.rules.has_aadhaar_linked_bank_account",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -551,9 +477,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "आप इसे सीएससी केंद्र, आपले सरकार केंद्र या अपने मोबाइल से ओटीपी द्वारा कर सकते हैं।",
       mr: "आपले सरकार केंद्र, सीएससी केंद्र किंवा मोबाईल ओटीपीद्वारे ई-केवायसी पूर्ण करता येते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.rules.ekyc_completed",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -571,9 +494,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "यदि सहायता राशि नहीं आ रही है, तो अपनी बैंक शाखा जाकर डीबीटी (DBT) सक्रिय करवाएं।",
       mr: "योजनेचे अनुदान जमा होण्यासाठी बँकेत जाऊन बँक खात्याला DBT सक्रिय असल्याची खात्री करा.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.rules.npci_aadhaar_seeded_bank",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -593,9 +513,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       mr: "पीएम किसान लाभार्थी असणाऱ्या शेतकऱ्यांना नमो शेतकरी महासन्मान योजनेतून अतिरिक्त ₹६,००० मिळतात.",
     },
     derivation: "derived from approved application on CENT-MOAFW-PMKISAN-001",
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-NAMOSHETKARI-012.eligibility.rules.approved_pm_kisan_beneficiary_in_maharashtra",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -613,9 +530,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "एग्रीस्टैक आईडी आपके खेत, फसल और आधार को एक डिजिटल पहचान में जोड़ती है।",
       mr: "ॲग्रीस्टॅक आयडी द्वारे शेतजमीन, पिके आणि आधार एकत्र जोडून डिजिटल ओळख तयार केली जाते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-NAMOSHETKARI-012.eligibility.rules.agristack_farmer_id_linked",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -633,9 +547,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम स्वनिधि योजना के तहत फेरीवालों को ₹10,000 से ₹50,000 तक का सस्ता कर्ज मिलता है।",
       mr: "पीएम स्वनिधी योजनेअंतर्गत पथविक्रेत्यांना ₹१०,००० ते ₹५०,००० पर्यंतचे खेळते भांडवल कर्ज मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHUA-PMSVANIDHI-004.eligibility.rules.is_street_vendor",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -653,9 +564,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "नगर निगम या टाउन वेंडिंग कमेटी द्वारा जारी किया गया अधिकृत कार्ड।",
       mr: "महानगरपालिका किंवा टाउन वेंडिंग कमिटीने दिलेले अधिकृत ओळखपत्र.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHUA-PMSVANIDHI-004.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -673,9 +581,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम विश्वकर्मा योजना में ₹15,000 का टूलकिट अनुदान और ₹3 लाख तक का कम ब्याज का लोन मिलता है।",
       mr: "पीएम विश्वकर्मा योजनेअंतर्गत ₹१५,००० चे टूलकिट अनुदान व ३ लाखांपर्यंतचे सवलतीचे कर्ज मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MSME-PMVISHWAKARMA-003.eligibility.rules.self_employed_unorganised_artisan",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -693,9 +598,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "इसमें 18 व्यवसाय शामिल हैं: बढ़ई, लोहार, सुनार, कुम्हार, मूर्तिकार, मोची, राजमिस्त्री, नाई, धोबी, दर्जी आदि।",
       mr: "यामध्ये १८ पारंपरिक व्यवसाय येतात: सुतार, लोहार, कुंभार, चांभार, गवंडी, नाभिक, परीट, शिंपी इत्यादी.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MSME-PMVISHWAKARMA-003.eligibility.rules.trade_in_18_notified_traditional_trades",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -713,9 +615,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "असंगठित मजदूर वे हैं जिनका ईपीएफ (EPF) या ईएसआईसी (ESIC) नहीं कटता।",
       mr: "ज्यांचे ईपीएफ किंवा ईएसआयसी कपात होत नाही असे सर्व रोजंदारी व कष्टकरी कामगार.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOLE-PMSYM-007.eligibility.rules.is_unorganised_worker",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -734,9 +633,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "इमारत व अन्य निर्माण कामगार बोर्ड (MahaBOCW) पंजीकरण के लिए पिछले 1 वर्ष में कम से कम 90 दिन का काम आवश्यक है।",
       mr: "महाराष्ट्र इमारत व इतर बांधकाम कामगार कल्याण मंडळात नोंदणीसाठी वर्षातून किमान ९० दिवस काम केलेले असणे आवश्यक आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-LAB-MAHABOCW-016.eligibility.rules.worked_in_construction_days_in_last_12m_gte",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -754,9 +650,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पंजीकृत निर्माण कामगारों को बच्चों की पढ़ाई के लिए आर्थिक सहायता, सुरक्षा किट और चिकित्सा लाभ मिलता है।",
       mr: "नोंदणीकृत बांधकाम कामगारांना शैक्षणिक सहाय्य, सुरक्षा किट व आरोग्य योजनांचा थेट लाभ मिळतो.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-LAB-MAHABOCW-016.eligibility.rules.active_mahabocw_registration",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -774,9 +667,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "प्रधानमंत्री मातृ वंदना योजना (PMMVY) के तहत पौष्टिक आहार व आराम के लिए ₹5,000 से ₹6,000 की नकद सहायता मिलती है।",
       mr: "प्रधानमंत्री मातृ वंदना योजनेअंतर्गत गरोदर मातांना ₹५,००० ते ₹६,००० चे पोषण अनुदान मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOWCD-PMMVY-005.eligibility.rules.is_pregnant_or_lactating_mother",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -794,9 +684,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "मातृ वंदना योजना पहले बच्चे के लिए, और दूसरे बच्चे के जन्म पर केवल बालिका होने पर वित्तीय सहायता देती है।",
       mr: "पहिल्या अपत्यासाठी ₹५०००, तर दुसरे अपत्य मुलगी असल्यास ₹६००० ची विशेष मदत मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOWCD-PMMVY-005.eligibility.rules.child_order_valid",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -814,9 +701,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "योजना का लाभ लेने के लिए निर्धारित समयसीमा में आवेदन जमा करना आवश्यक है।",
       mr: "मुदतीत अर्ज सादर केल्यासच मातृ वंदना योजनेचा लाभ मिळू शकतो.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOWCD-PMMVY-005.eligibility.rules.applied_within_270_days_of_childbirth",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -834,9 +718,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "लेक लाड़की योजना के तहत 1 अप्रैल 2023 के बाद जन्मी बेटियों को 18 वर्ष तक कुल ₹1,01,000 की सहायता दी जाती है।",
       mr: "लेक लाडकी योजनेअंतर्गत १ एप्रिल २०२३ नंतर जन्मलेल्या मुलींना १८ वर्षांपर्यंत एकूण ₹१,०१,००० ची आर्थिक मदत टप्प्याटप्प्याने मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LEKLADKI-011.eligibility.rules.born_on_or_after",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -854,9 +735,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "ईबीसी फीस प्रतिपूर्ति योजना के लिए सीएपी (CAP) मेरिट के माध्यम से दाखिला होना जरूरी है, मैनेजमेंट कोटे से नहीं।",
       mr: "राजर्षी शाहू महाराज शिक्षण शुल्क प्रतिपूर्ती योजनेसाठी कॅप फेरीतून प्रवेश आवश्यक आहे, व्यवस्थापन कोट्यातील नाही.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-DHE-EBC-SHAHU-018.eligibility.rules.admitted_through_cap_centralized_admission_process",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -874,9 +752,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "नागपुर जिले के खनन प्रभावित तालुकों के गांवों के लिए डीएमएफ (DMF) योजनाएं उपलब्ध हैं।",
       mr: "नागपूर जिल्ह्यातील खाणबाधित गावांना जिल्हा खनिज प्रतिष्ठान (DMF) अंतर्गत विशेष योजना मिळतात.",
     },
-      review_status: "machine_drafted",
-    derived_from: "DIST-NGP-DMF-WELFARE-019.eligibility.rules.village_in_notified_mining_affected_list",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -894,9 +769,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "विदर्भ व मराठवाड़ा के चयनित गांवों में किसानों को ड्रिप, शेततले व कृषि औजारों पर 75% तक अनुदान मिलता है।",
       mr: "विदर्भातील निवडक दुष्काळप्रवण गावांमध्ये शेततळे, ठिबक व औजारांसाठी पोकराअंतर्गत थेट अनुदान मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-POCRA-023.eligibility.rules.is_pocra_notified_village",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -915,9 +787,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "दिव्यांग पेंशन के लिए न्यूनतम 40% दिव्यांगता का सरकारी प्रमाण पत्र आवश्यक है।",
       mr: "दिव्यांग पेन्शनसाठी किमान ४०% दिव्यांगत्वाचे अधिकृत प्रमाणपत्र असणे आवश्यक आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MORD-NSAP-006.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -935,9 +804,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "राष्ट्रीय पारिवारिक लाभ योजना (NFBS) के तहत बीपीएल परिवारों को ₹20,000 की एकमुश्त सहायता दी जाती है।",
       mr: "राष्ट्रीय कुटुंब लाभ योजनेअंतर्गत (NFBS) दारिद्र्यरेषेखालील कुटुंबाला ₹२०,००० चे एकरकमी अर्थसहाय्य मिळते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MORD-NSAP-006.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -955,9 +821,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "एनएफएसए कार्डधारकों को मुफ्त राशन मिलता है और वे आयुष्मान भारत योजना के स्वतः पात्र होते हैं।",
       mr: "NFSA रेशन कार्डधारकांना मोफत अन्नधान्य मिळते आणि ते आयुष्यमान भारत योजनेसाठी थेट पात्र ठरतात.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOHFW-PMJAY-002.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -975,9 +838,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "गोपीनाथ मुंडे शेतकरी सुरक्षा सानुग्रह अनुदान योजना दुर्घटना में मृत्यु या अपंगता पर ₹2,00,000 का मुआवजा देती है।",
       mr: "गोपीनाथ मुंडे शेतकरी अपघात सानुग्रह अनुदान योजनेअंतर्गत अपघाती मृत्यू किंवा अपंगत्वावर २ लाखांपर्यंत मदत दिली जाते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-GOPINATHMUNDE-013.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -995,9 +855,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "तलाठी या ग्रामसेवक द्वारा प्रमाणित भूमिहीन खेत मजदूर भी दुर्घटना सहायता के पात्र हैं।",
       mr: "तलाठी किंवा ग्रामसेवकांकडून प्रमाणित भूमिहीन शेतमजूरही शासकीय अपघात अनुदानास पात्र ठरतात.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-AGR-GOPINATHMUNDE-013.eligibility.rules.qualifying_pathway",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1015,9 +872,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "यह प्रमाण पत्र सिद्ध करता है कि आप कम से कम 15 वर्ष से महाराष्ट्र में रह रहे हैं।",
       mr: "हे प्रमाणपत्र तुम्ही महाराष्ट्रात किमान १५ वर्षे वास्तव्यास असल्याचा अधिकृत पुरावा आहे.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SJSA-SANJAYGANDHI-014.eligibility.rules.years_in_maharashtra_gte",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1035,9 +889,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "यदि परिवार में कोई आयकर दाता है, तो अधिकांश कल्याणकारी योजनाओं का लाभ नहीं मिलता।",
       mr: "कुटुंबात आयकर भरणारी व्यक्ती असल्यास अनेक शासकीय योजनांचा लाभ मिळत नाही.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.exclusion_rules.family_member_income_tax_payer",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1055,9 +906,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "नियमित सरकारी कर्मचारियों के परिवार कल्याणकारी नकद योजनाओं के लिए अपात्र होते हैं।",
       mr: "नियमित शासकीय कर्मचाऱ्यांच्या कुटुंबीयांना सामान्यतः आर्थिक लाभाच्या योजनांमधून वगळण्यात येते.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.exclusion_rules.family_member_regular_govt_psu_employee_or_pensioner",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1075,9 +923,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "खेती का ट्रैक्टर मान्य है, लेकिन कार या जीप होने पर लाड़की बहिन योजना का लाभ नहीं मिलता।",
       mr: "शेतीचा ट्रॅक्टर चालतो, परंतु कार किंवा जीप असल्यास लाडकी बहीण योजनेस अपात्र ठरतात.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-WCD-LADKIBAHIN-010.eligibility.exclusion_rules.family_owns_four_wheeler_excluding_tractor",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1095,9 +940,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "सरकारी मकान का लाभ एक परिवार को जीवन में केवल एक बार ही मिलता है।",
       mr: "शासकीय घरकुलाचा लाभ कुटुंबाला आयुष्यात एकदाच दिला जातो.",
     },
-      review_status: "machine_drafted",
-    derived_from: "MH-SJSA-RAMAIAWAS-021.eligibility.exclusion_rules.availed_other_government_housing_scheme",
-    help_text_source: "dataset",
     status: "curated",
   },
   {
@@ -1115,9 +957,6 @@ export const QUESTION_BANK: QuestionBankItem[] = [
       hi: "पीएम किसान और किसान योजनाएं केवल व्यक्तिगत कृषक परिवारों के लिए हैं, संस्थाओं के लिए नहीं।",
       mr: "पीएम किसान व शेतकरी योजना केवळ वैयक्तिक शेतकरी कुटुंबांसाठी असून संस्थांसाठी नाहीत.",
     },
-      review_status: "machine_drafted",
-    derived_from: "CENT-MOAFW-PMKISAN-001.eligibility.exclusion_rules.institutional_landholder",
-    help_text_source: "dataset",
     status: "curated",
   },
 ];

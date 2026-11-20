@@ -1,7 +1,10 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
+import crypto from "crypto";
 import { db } from "../../db/index.js";
 import * as schema from "../../db/schema.js";
 import { EligibilityService } from "../eligibility/service.js";
+import { AnswersService } from "./answers-service.js";
+import { ConsentService } from "./consent-service.js";
 
 export class HouseholdService {
   static async createHousehold(data: {
@@ -9,18 +12,18 @@ export class HouseholdService {
     district_id?: string;
     taluka?: string;
     state?: string;
-    preferred_lang?: "en" | "hi" | "mr";
-    text_tier?: "STANDARD" | "LARGE" | "EXTRA_LARGE";
   }) {
     const householdId = `hh_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const access_secret = `sec_${crypto.randomBytes(24).toString("hex")}`;
+    const access_secret_hash = crypto.createHash("sha256").update(access_secret).digest("hex");
+
     await db.insert(schema.households).values({
       household_id: householdId,
       consent_given: data.consent_given ?? true,
       district_id: data.district_id,
       taluka: data.taluka,
       state: data.state || "Maharashtra",
-      preferred_lang: data.preferred_lang || "mr",
-      text_tier: data.text_tier || "LARGE",
+      access_secret_hash,
     });
 
     const created = await db
@@ -29,7 +32,152 @@ export class HouseholdService {
       .where(eq(schema.households.household_id, householdId))
       .limit(1);
 
-    return created[0];
+    return {
+      ...created[0],
+      access_secret,
+    };
+  }
+
+  static async claimHousehold(data: {
+    household_id?: string;
+    answers: Record<string, unknown>;
+    consent?: {
+      data_processing?: boolean;
+      sms_reminders?: boolean;
+      volunteer_assist?: boolean;
+    };
+    district_id?: string;
+    taluka?: string;
+    state?: string;
+    lang?: "en" | "hi" | "mr";
+  }) {
+    AnswersService.assertNoSensitiveId(data.answers);
+
+    const access_secret = `sec_${crypto.randomBytes(24).toString("hex")}`;
+    const access_secret_hash = crypto.createHash("sha256").update(access_secret).digest("hex");
+
+    let householdId = data.household_id;
+    const districtId = data.district_id || (data.answers.district as string | undefined);
+    const taluka = data.taluka || (data.answers.taluka as string | undefined);
+    const state = data.state || (data.answers.residence_state as string | undefined) || "Maharashtra";
+    const phone =
+      (data.answers.phone_number as string | undefined) ||
+      (data.answers.phone as string | undefined) ||
+      (data.answers.contact_phone as string | undefined);
+
+    if (householdId) {
+      const existing = await db
+        .select()
+        .from(schema.households)
+        .where(eq(schema.households.household_id, householdId))
+        .limit(1);
+
+      if (existing.length > 0 && existing[0]) {
+        const currentHh = existing[0];
+        await db
+          .update(schema.households)
+          .set({
+            consent_given: data.consent?.data_processing ?? true,
+            district_id: districtId || currentHh.district_id,
+            taluka: taluka || currentHh.taluka,
+            state: state || currentHh.state,
+            contact_phone: phone || currentHh.contact_phone,
+            access_secret_hash,
+            updated_at: new Date(),
+          })
+          .where(eq(schema.households.household_id, householdId));
+      } else {
+        await db.insert(schema.households).values({
+          household_id: householdId,
+          consent_given: data.consent?.data_processing ?? true,
+          district_id: districtId,
+          taluka,
+          state,
+          contact_phone: phone,
+          created_by_role: "citizen",
+          access_secret_hash,
+        });
+      }
+    } else {
+      householdId = `hh_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await db.insert(schema.households).values({
+        household_id: householdId,
+        consent_given: data.consent?.data_processing ?? true,
+        district_id: districtId,
+        taluka,
+        state,
+        contact_phone: phone,
+        created_by_role: "citizen",
+        access_secret_hash,
+      });
+    }
+
+    const existingMembers = await db
+      .select()
+      .from(schema.householdMembers)
+      .where(eq(schema.householdMembers.household_id, householdId));
+
+    let memberId = existingMembers[0]?.member_id;
+    if (!memberId) {
+      memberId = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await db.insert(schema.householdMembers).values({
+        member_id: memberId,
+        household_id: householdId,
+        relation_to_head: "SELF",
+        age: typeof data.answers.age === "number" ? data.answers.age : undefined,
+        gender: typeof data.answers.gender === "string" ? data.answers.gender : undefined,
+        occupation: typeof data.answers.occupation === "string" ? data.answers.occupation : undefined,
+        caste_category: typeof data.answers.caste_category === "string" ? data.answers.caste_category : undefined,
+        marital_status: typeof data.answers.marital_status === "string" ? data.answers.marital_status : undefined,
+        answers: data.answers,
+      });
+    }
+
+    for (const [key, val] of Object.entries(data.answers)) {
+      await db.insert(schema.memberAnswers).values({
+        household_id: householdId,
+        member_id: memberId,
+        attribute_key: key,
+        value: val,
+        source: "self_declared",
+        status: "confirmed",
+        updated_by_role: "citizen",
+      });
+    }
+
+    if (data.consent?.data_processing !== false) {
+      await ConsentService.recordConsent({
+        household_id: householdId,
+        purpose: "data_processing",
+        lang: data.lang || "en",
+      });
+    }
+    if (data.consent?.sms_reminders) {
+      await ConsentService.recordConsent({
+        household_id: householdId,
+        purpose: "sms_reminders",
+        lang: data.lang || "en",
+      });
+    }
+    if (data.consent?.volunteer_assist) {
+      await ConsentService.recordConsent({
+        household_id: householdId,
+        purpose: "volunteer_assist",
+        lang: data.lang || "en",
+      });
+    }
+
+    await ConsentService.recordDeclaration({
+      household_id: householdId,
+      lang: data.lang || "en",
+    });
+
+    const hh = await this.getHousehold(householdId);
+    return {
+      ...hh,
+      household_id: householdId,
+      access_secret,
+    };
   }
 
   static async getHousehold(householdId: string) {
@@ -50,35 +198,45 @@ export class HouseholdService {
       .from(schema.householdDocuments)
       .where(eq(schema.householdDocuments.household_id, householdId));
 
+    const storedAnswers = await db
+      .select()
+      .from(schema.memberAnswers)
+      .where(
+        and(
+          eq(schema.memberAnswers.household_id, householdId),
+          eq(schema.memberAnswers.status, "confirmed")
+        )
+      );
+
+    const answersByMember = new Map<string, Record<string, unknown>>();
+    const hhAnswers: Record<string, unknown> = {};
+
+    for (const ans of storedAnswers) {
+      if (ans.value !== null) {
+        if (ans.member_id) {
+          const mAns = answersByMember.get(ans.member_id) || {};
+          mAns[ans.attribute_key] = ans.value;
+          answersByMember.set(ans.member_id, mAns);
+        } else {
+          hhAnswers[ans.attribute_key] = ans.value;
+        }
+      }
+    }
+
+    const enrichedMembers = members.map((m) => ({
+      ...m,
+      answers: {
+        ...hhAnswers,
+        ...((m.answers as Record<string, unknown>) || {}),
+        ...(answersByMember.get(m.member_id) || {}),
+      },
+    }));
+
     return {
       ...hh[0],
-      members,
+      members: enrichedMembers,
       documents: docs,
     };
-  }
-
-  static async getPreferredLang(householdId?: string): Promise<"en" | "hi" | "mr"> {
-    if (!householdId) return "mr";
-    const hh = await db
-      .select({ preferred_lang: schema.households.preferred_lang })
-      .from(schema.households)
-      .where(eq(schema.households.household_id, householdId))
-      .limit(1);
-    const lang = hh[0]?.preferred_lang;
-    if (lang === "en" || lang === "hi" || lang === "mr") return lang;
-    return "mr";
-  }
-
-  static async getPreferredTextTier(householdId?: string): Promise<"STANDARD" | "LARGE" | "EXTRA_LARGE"> {
-    if (!householdId) return "LARGE";
-    const hh = await db
-      .select({ text_tier: schema.households.text_tier })
-      .from(schema.households)
-      .where(eq(schema.households.household_id, householdId))
-      .limit(1);
-    const tier = hh[0]?.text_tier;
-    if (tier === "STANDARD" || tier === "LARGE" || tier === "EXTRA_LARGE") return tier;
-    return "LARGE";
   }
 
   static async addMember(

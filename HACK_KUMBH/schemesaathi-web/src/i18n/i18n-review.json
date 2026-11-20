@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-11-20T00:30:00Z",
+  "languages": {
+    "en": {
+      "status": "reviewed",
+      "author": "editorial_team",
+      "coverage": 100
+    },
+    "mr": {
+      "status": "machine_drafted",
+      "note": "Machine-drafted translations for Vidarbha Marathi dialect. Requires review by regional language expert.",
+      "coverage": 100,
+      "review_pending": true
+    },
+    "hi": {
+      "status": "machine_drafted",
+      "note": "Machine-drafted translations for standard Hindi. Requires review by certified government translator.",
+      "coverage": 100,
+      "review_pending": true
+    }
+  }
+}

@@ -8,12 +8,119 @@ import {
   PatchHouseholdSchema,
   PatchMemberSchema,
   UpdateHouseholdDocumentSchema,
+  ClaimHouseholdSchema,
+  PatchAnswersSchema,
+  ProposedAnswersSchema,
+  ConfirmProposedSchema,
 } from "./schema.js";
 import { HouseholdService } from "./service.js";
-import { requireRole } from "../../services/auth.js";
+import { AnswersService } from "./answers-service.js";
+import { ConsentService } from "./consent-service.js";
+import { ProfileSectionsService } from "../../services/profile-sections.js";
+import { verifyHouseholdAccess } from "../../services/auth.js";
 
 export const householdRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook("preHandler", requireRole(["citizen_or_volunteer", "admin"]));
+  fastify.addHook("preHandler", async (request, reply) => {
+    // Only check household access secret on /households/:id routes
+    if (!request.url.includes("/households/")) {
+      return;
+    }
+    const params = request.params as { id?: string } | undefined;
+    if (params && params.id) {
+      const ok = await verifyHouseholdAccess(request, reply, params.id);
+      if (!ok) {
+        return reply;
+      }
+    }
+  });
+  // GET /profile/sections
+  fastify.get("/profile/sections", async (request) => {
+    const query = request.query as { lang?: "en" | "hi" | "mr" };
+    return await ProfileSectionsService.getSections(query.lang || "en");
+  });
+
+  // GET /households/:id/profile
+  fastify.get("/households/:id/profile", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const query = request.query as { lang?: "en" | "hi" | "mr" };
+    const profile = await ProfileSectionsService.getHouseholdProfile(id, query.lang || "en");
+    if (!profile) {
+      return reply.status(404).send({
+        error: { code: "HOUSEHOLD_NOT_FOUND", message: `Household '${id}' not found` },
+      });
+    }
+    return profile;
+  });
+
+  // POST /households/claim
+  fastify.post("/households/claim", async (request, reply) => {
+    const body = ClaimHouseholdSchema.parse(request.body);
+    const created = await HouseholdService.claimHousehold(body);
+    return reply.status(201).send(created);
+  });
+
+  // PATCH /households/:id/answers
+  fastify.patch("/households/:id/answers", async (request) => {
+    const { id } = request.params as { id: string };
+    const body = PatchAnswersSchema.parse(request.body);
+
+    const answersDict: Record<string, unknown> = {
+      ...(body.answers || {}),
+    };
+    if (body.items) {
+      for (const item of body.items) {
+        answersDict[item.attribute_key] = item.value;
+      }
+    }
+
+    // Derive role strictly from configured API key (never from untrusted headers)
+    const userRole = request.userRole;
+    // X-Assisted-By is kept strictly as an audit label
+    const assistedBy = request.headers["x-assisted-by"] as string | undefined;
+
+    return await AnswersService.patchAnswers(
+      id,
+      {
+        answers: answersDict,
+        member_id: body.member_id,
+        source: body.source,
+      },
+      { role: userRole, assistedBy }
+    );
+  });
+
+  // POST /households/:id/answers/proposed
+  fastify.post("/households/:id/answers/proposed", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = ProposedAnswersSchema.parse(request.body);
+    const result = await AnswersService.storeProposed(id, body);
+    return reply.status(201).send(result);
+  });
+
+  // POST /households/:id/answers/confirm
+  fastify.post("/households/:id/answers/confirm", async (request) => {
+    const { id } = request.params as { id: string };
+    const body = ConfirmProposedSchema.parse(request.body);
+    return await AnswersService.confirmProposed(id, body);
+  });
+
+  // PATCH /consents/:id/withdraw
+  fastify.patch("/consents/:id/withdraw", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const result = await ConsentService.withdrawConsent(Number(id));
+    if (!result) {
+      return reply.status(404).send({
+        error: { code: "CONSENT_NOT_FOUND", message: `Consent record '${id}' not found` },
+      });
+    }
+    return result;
+  });
+
+  // DELETE /households/:id (Right to be forgotten)
+  fastify.delete("/households/:id", async (request) => {
+    const { id } = request.params as { id: string };
+    return await ConsentService.rightToBeForgotten(id);
+  });
 
   // POST /households
   fastify.post("/households", async (request, reply) => {
@@ -120,13 +227,12 @@ export const householdRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/households/:id/schemes/:schemeId/checklist", async (request, reply) => {
     const { id, schemeId } = request.params as { id: string; schemeId: string };
     const query = request.query as { member_id?: string; lang?: "en" | "hi" | "mr" };
-    const lang = query.lang || (await HouseholdService.getPreferredLang(id));
 
     const checklist = await HouseholdService.getSchemeChecklist(
       id,
       schemeId,
       query.member_id,
-      lang
+      query.lang || "en"
     );
 
     if (!checklist) {
@@ -142,9 +248,8 @@ export const householdRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/households/:id/document-plan", async (request, reply) => {
     const { id } = request.params as { id: string };
     const query = request.query as { lang?: "en" | "hi" | "mr" };
-    const lang = query.lang || (await HouseholdService.getPreferredLang(id));
 
-    const plan = await HouseholdService.getDocumentPlan(id, lang);
+    const plan = await HouseholdService.getDocumentPlan(id, query.lang || "en");
     if (!plan) {
       return reply.status(404).send({
         error: { code: "HOUSEHOLD_NOT_FOUND", message: `Household '${id}' not found` },
@@ -166,8 +271,7 @@ export const householdRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    const lang = query.lang || (hh.preferred_lang as "en" | "hi" | "mr") || "mr";
     const { ReminderService } = await import("../reminders/service.js");
-    return await ReminderService.getRemindersForHousehold(id, lang);
+    return await ReminderService.getRemindersForHousehold(id, query.lang || "en");
   });
 };

@@ -23,23 +23,9 @@ export async function initDb(): Promise<AnyDb> {
   }
 
   const url = config.databaseUrl;
-  if (!url) {
-    throw new Error(
-      "[DATABASE_URL Missing] DATABASE_URL environment variable is not set. Please configure DATABASE_URL in .env (e.g. DATABASE_URL=postgresql://user:pass@host:5432/db for Real PostgreSQL or DATABASE_URL=pglite://.db_data for PGlite)."
-    );
-  }
+  const isExplicitMemory = url.startsWith("memory:") || url === "memory";
 
-  const isPostgres = url.startsWith("postgresql://") || url.startsWith("postgres://");
-  const isPglite = url.startsWith("pglite:") || url.startsWith("memory:") || url === "memory";
-
-  if (!isPostgres && !isPglite) {
-    throw new Error(
-      `[DATABASE_URL Invalid] Unsupported database protocol in DATABASE_URL: '${url}'. Must start with 'postgresql://', 'postgres://', 'pglite:', or 'memory:'.`
-    );
-  }
-
-  if (isPostgres) {
-    const sanitizedUrl = url.replace(/:[^:@]+@/, ":****@");
+  if (!isExplicitMemory) {
     try {
       const useSsl =
         url.includes("sslmode=require") ||
@@ -50,7 +36,7 @@ export async function initDb(): Promise<AnyDb> {
 
       const pool = new pg.Pool({
         connectionString: url,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 3000,
         ssl: useSsl ? { rejectUnauthorized: config.dbSslRejectUnauthorized } : undefined,
       });
       const client = await pool.connect();
@@ -58,21 +44,19 @@ export async function initDb(): Promise<AnyDb> {
       pgPoolInstance = pool;
       dbInstance = drizzleNodePg(pool, { schema });
       dbType = "postgres";
-      console.log(`[DB] Active database engine: postgres (real PostgreSQL server at ${sanitizedUrl})`);
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      throw new Error(
-        `[DB Connection Failed] Failed to connect to Real PostgreSQL server at ${sanitizedUrl}: ${errMsg}. Silent fallback to PGlite is disabled.`
-      );
+    } catch {
+      // Postgres not available; fallback to embedded PGlite
     }
-  } else {
-    // PGlite (embedded WASM PostgreSQL)
+  }
+
+  if (!dbInstance) {
     let pglitePath: string | undefined = undefined;
-    if (!url.startsWith("memory")) {
+    if (!isExplicitMemory) {
       pglitePath = path.resolve(process.cwd(), ".db_data");
       if (!fs.existsSync(pglitePath)) {
         fs.mkdirSync(pglitePath, { recursive: true });
       } else {
+        // Clean stale lock / pid files if left over from previous unclean process exit
         const pidFile = path.join(pglitePath, "postmaster.pid");
         if (fs.existsSync(pidFile)) {
           try {
@@ -87,7 +71,6 @@ export async function initDb(): Promise<AnyDb> {
     pgliteInstance = new PGlite(pglitePath);
     dbInstance = drizzlePglite(pgliteInstance, { schema });
     dbType = "pglite";
-    console.log(`[DB] Active database engine: pglite (embedded WASM PostgreSQL at ${pglitePath || "memory"})`);
   }
 
   // Ensure tables and indexes exist

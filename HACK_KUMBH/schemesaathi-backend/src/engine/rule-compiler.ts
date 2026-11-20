@@ -23,12 +23,6 @@ export interface RawSchemeEligibilityInput {
   scheme_id: string;
   parent_scheme_id?: string;
   operational_status?: { status?: string; accepting_applications?: string };
-  benefit_type?: string;
-  area_type?: string;
-  excluded_talukas?: string[];
-  included_talukas?: string[];
-  non_stackable_with?: string[];
-  benefit_cap?: { max_amount?: number; period?: string; currency?: string };
   eligibility?: {
     rules?: RawRuleInput[];
     minimum_age?: number | null;
@@ -165,18 +159,20 @@ export class RuleCompiler {
     const statesList = input.resolved_states || (state && state !== "ALL_INDIA" ? [state] : []);
     const districtIdsList = input.resolved_district_ids || input.scheme_classification?.implementing_districts || [];
 
-    const areaType = input.area_type || "ALL";
-    const excludedTalukas = input.excluded_talukas;
-    const includedTalukas = input.included_talukas;
+    const districtTokens = input.scheme_classification?.implementing_districts || [];
+    const isUrbanToken = districtTokens.some((t) =>
+      typeof t === "string" && ["ALL_INDIA_URBAN", "NAGPUR_NMC_10_ZONES", "VIDARBHA_ULBS"].includes(t.toUpperCase())
+    );
+    const isNmcToken = districtTokens.some((t) =>
+      typeof t === "string" && t.toUpperCase() === "NAGPUR_NMC_10_ZONES"
+    );
+    const areaType = isUrbanToken ? "URBAN" : "ALL";
 
     return {
       scheme_id: input.scheme_id,
       parent_scheme_id: input.parent_scheme_id,
       status: input.operational_status?.status || "ACTIVE",
       accepting_applications: input.operational_status?.accepting_applications || "YES",
-      benefit_type: input.benefit_type,
-      non_stackable_with: input.non_stackable_with,
-      benefit_cap: input.benefit_cap,
       rules: compiledRules,
       exclusion_rules: compiledExclusions,
       other_conditions: compiledOtherConditions,
@@ -189,8 +185,7 @@ export class RuleCompiler {
         states: statesList.length > 0 ? statesList : undefined,
         district_ids: districtIdsList.length > 0 ? districtIdsList : undefined,
         area_type: areaType,
-        excluded_talukas: excludedTalukas && excludedTalukas.length > 0 ? excludedTalukas : undefined,
-        included_talukas: includedTalukas && includedTalukas.length > 0 ? includedTalukas : undefined,
+        nmc_only: isNmcToken,
       },
     };
   }

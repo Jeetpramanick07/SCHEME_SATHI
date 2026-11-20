@@ -139,14 +139,6 @@ export const SchemeSchema = z
     sources: z.array(z.union([z.string(), z.record(z.unknown())])).optional(),
     confidence_level: z.string().nullable().optional(),
     data_completeness: z.string().nullable().optional(),
-    non_stackable_with: z.array(z.string()).optional(),
-    benefit_cap: z
-      .object({
-        max_amount: z.number().optional(),
-        period: z.string().optional(),
-        currency: z.string().optional(),
-      })
-      .optional(),
   })
   .passthrough();
 

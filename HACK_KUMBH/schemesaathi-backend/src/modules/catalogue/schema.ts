@@ -19,7 +19,6 @@ export const SchemeQuerySchema = z.object({
   view: z.enum(["card", "detail"]).optional().default("card"),
   fields: z.string().optional(),
   lang: z.enum(["en", "hi", "mr"]).optional().default("en"),
-  household_id: z.string().optional(),
   include_test: z.coerce.boolean().optional().default(false),
   source: z.enum(["cache", "db"]).optional().default("cache"),
 });
@@ -40,8 +39,6 @@ export const SchemeCardResponseSchema = z.object({
   max_age: z.number().nullable().optional(),
   lang_served: z.enum(["en", "hi", "mr"]),
   lang_fallback: z.boolean(),
-  display_name_fallback: z.boolean().optional(),
-  explanation_fallback: z.boolean().optional(),
 });
 
 export const SchemeListResponseSchema = z.object({
@@ -69,4 +66,10 @@ export const HelpCentreQuerySchema = z.object({
   lat: z.coerce.number().optional(),
   lon: z.coerce.number().optional(),
   limit: z.coerce.number().min(1).max(50).default(20),
+});
+
+export const FaqQuerySchema = z.object({
+  q: z.string().optional(),
+  scheme_id: z.string().optional(),
+  limit: z.coerce.number().min(1).max(100).default(20),
 });

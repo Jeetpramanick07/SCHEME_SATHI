@@ -96,9 +96,6 @@ export const geoScopeTokens = pgTable("geo_scope_tokens", {
   token: varchar("token", { length: 64 }).primaryKey(),
   resolved_district_ids: jsonb("resolved_district_ids").$type<string[]>().notNull(),
   states: jsonb("states").$type<string[]>().notNull(),
-  area_type: varchar("area_type", { length: 32 }).default("ALL"),
-  excluded_talukas: jsonb("excluded_talukas").$type<string[]>(),
-  included_talukas: jsonb("included_talukas").$type<string[]>(),
   description: text("description"),
 });
 
@@ -112,22 +109,21 @@ export const attributes = pgTable("attributes", {
   question_text: jsonb("question_text").$type<{ en: string; hi?: string; mr?: string }>().notNull(),
   help_text: jsonb("help_text").$type<{ en?: string; hi?: string; mr?: string }>(),
   derivation: text("derivation"),
-  derived_from: text("derived_from"),
   derived_from_approved_scheme: varchar("derived_from_approved_scheme", { length: 64 }),
   review_status: varchar("review_status", { length: 32 }).notNull().default("machine_drafted"), // machine_drafted | reviewed
-  help_text_source: varchar("help_text_source", { length: 64 }).default("unverified"), // dataset | unverified
+  help_text_source: varchar("help_text_source", { length: 64 }).default("dataset"), // dataset | unverified
   status: varchar("status", { length: 32 }).notNull().default("curated"), // curated | auto_registered
 });
 
 export const schemes = pgTable("schemes", {
-  scheme_id: varchar("scheme_id", { length: 64 }).primaryKey(),
-  parent_scheme_id: varchar("parent_scheme_id", { length: 64 }),
+  scheme_id: varchar("scheme_id", { length: 128 }).primaryKey(),
+  parent_scheme_id: varchar("parent_scheme_id", { length: 128 }),
   official_name: varchar("official_name", { length: 255 }).notNull(),
   translated_names: jsonb("translated_names").$type<{ en: string; hi?: string; mr?: string }>().notNull(),
   level: varchar("level", { length: 32 }).notNull(),
-  scheme_type: varchar("scheme_type", { length: 64 }).notNull(),
-  implementing_state: varchar("implementing_state", { length: 64 }),
-  department_id: varchar("department_id", { length: 64 }),
+  scheme_type: varchar("scheme_type", { length: 128 }).notNull(),
+  implementing_state: varchar("implementing_state", { length: 128 }),
+  department_id: varchar("department_id", { length: 255 }),
   overview: jsonb("overview").notNull(),
   benefits: jsonb("benefits").notNull(),
   raw: jsonb("raw").notNull(),
@@ -140,16 +136,17 @@ export const schemes = pgTable("schemes", {
   states: jsonb("states").$type<string[]>(),
   district_ids: jsonb("district_ids").$type<string[]>(),
   area_type: varchar("area_type", { length: 32 }).default("ALL"), // URBAN | RURAL | ALL
-  benefit_type: varchar("benefit_type", { length: 64 }),
+  benefit_type: varchar("benefit_type", { length: 128 }),
   beneficiary_categories: jsonb("beneficiary_categories").$type<string[]>(),
-  non_stackable_with: jsonb("non_stackable_with").$type<string[]>(),
-  benefit_cap: jsonb("benefit_cap").$type<{ max_amount?: number; period?: string; currency?: string }>(),
   status: varchar("status", { length: 32 }).notNull().default("ACTIVE"),
   accepting_applications: varchar("accepting_applications", { length: 32 }).notNull().default("YES"),
   last_verified: varchar("last_verified", { length: 32 }),
   confidence_level: varchar("confidence_level", { length: 32 }),
   data_completeness: varchar("data_completeness", { length: 32 }),
   translation_status: jsonb("translation_status").$type<Record<string, { en: string; hi: string; mr: string }>>(),
+  myscheme_id: varchar("myscheme_id", { length: 128 }),
+  source: varchar("source", { length: 32 }).notNull().default("curated"), // curated | imported | synthetic
+  verified: boolean("verified").notNull().default(false),
   is_test: boolean("is_test").notNull().default(false),
   content_hash: varchar("content_hash", { length: 64 }).notNull(),
   version: integer("version").notNull().default(1),
@@ -185,8 +182,10 @@ export const households = pgTable("households", {
   district_id: varchar("district_id", { length: 64 }),
   taluka: varchar("taluka", { length: 64 }),
   state: varchar("state", { length: 64 }).default("Maharashtra"),
-  preferred_lang: varchar("preferred_lang", { length: 16 }).default("mr").notNull(),
-  text_tier: varchar("text_tier", { length: 32 }).default("LARGE").notNull(),
+  created_by_role: varchar("created_by_role", { length: 32 }).default("citizen"),
+  access_secret_hash: varchar("access_secret_hash", { length: 128 }),
+  contact_phone: varchar("contact_phone", { length: 32 }),
+  is_synthetic: boolean("is_synthetic").default(false).notNull(),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
@@ -222,9 +221,15 @@ export const applications = pgTable("applications", {
   member_id: varchar("member_id", { length: 64 }).notNull(),
   scheme_id: varchar("scheme_id", { length: 64 }).notNull(),
   status: varchar("status", { length: 32 }).notNull().default("DRAFT"), // DRAFT | SUBMITTED | IN_REVIEW | APPROVED | REJECTED
+  outcome: varchar("outcome", { length: 32 }).default("pending"), // approved | rejected | pending | withdrawn
+  rejection_reason_code: varchar("rejection_reason_code", { length: 64 }),
+  rejection_note: text("rejection_note"),
+  outcome_recorded_by_role: varchar("outcome_recorded_by_role", { length: 32 }),
+  outcome_at: timestamp("outcome_at"),
   reference_no: varchar("reference_no", { length: 128 }),
   tracking_url: text("tracking_url"),
   current_step_number: integer("current_step_number").default(1),
+  is_synthetic: boolean("is_synthetic").default(false).notNull(),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
@@ -246,4 +251,127 @@ export const applicationAuditEvents = pgTable("application_audit_events", {
   new_status: varchar("new_status", { length: 32 }).notNull(),
   note: text("note"),
   created_at: timestamp("created_at").defaultNow(),
+});
+
+export const schemeFaqs = pgTable("scheme_faqs", {
+  id: serial("id").primaryKey(),
+  scheme_id: varchar("scheme_id", { length: 128 }).notNull(),
+  scheme_name: varchar("scheme_name", { length: 255 }),
+  faq_number: integer("faq_number"),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const vidarbhaSchemeDistricts = pgTable("vidarbha_scheme_districts", {
+  id: serial("id").primaryKey(),
+  district_id: varchar("district_id", { length: 64 }).notNull(),
+  district: varchar("district", { length: 128 }).notNull(),
+  scheme_id: varchar("scheme_id", { length: 128 }).notNull(),
+  scheme_name: varchar("scheme_name", { length: 255 }).notNull(),
+  coverage: varchar("coverage", { length: 128 }),
+  portal: text("portal"),
+  application_mode: varchar("application_mode", { length: 64 }),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const profileSections = pgTable("profile_sections", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  order: integer("order").notNull(),
+  scope: varchar("scope", { length: 32 }).notNull().default("household"), // household | member
+  title: jsonb("title").$type<{ en: string; hi?: string; mr?: string }>().notNull(),
+  description: jsonb("description").$type<{ en?: string; hi?: string; mr?: string }>(),
+  skippable: boolean("skippable").default(true),
+});
+
+export const profileSectionFields = pgTable("profile_section_fields", {
+  id: serial("id").primaryKey(),
+  section_id: varchar("section_id", { length: 64 }).notNull(),
+  attribute_key: varchar("attribute_key", { length: 128 }).notNull(),
+  order: integer("order").notNull(),
+  required_for_count: integer("required_for_count").default(0),
+  optional: boolean("optional").default(true),
+});
+
+export const memberAnswers = pgTable("member_answers", {
+  id: serial("id").primaryKey(),
+  household_id: varchar("household_id", { length: 64 }).notNull(),
+  member_id: varchar("member_id", { length: 64 }),
+  attribute_key: varchar("attribute_key", { length: 128 }).notNull(),
+  value: jsonb("value"),
+  source: varchar("source", { length: 32 }).notNull().default("self_declared"), // self_declared | chatbot_confirmed | digilocker | aadhaar_qr | volunteer_confirmed | document_verified
+  status: varchar("status", { length: 32 }).notNull().default("confirmed"), // confirmed | proposed
+  updated_by_role: varchar("updated_by_role", { length: 32 }).default("citizen"),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const consentRecords = pgTable("consent_records", {
+  id: serial("id").primaryKey(),
+  household_id: varchar("household_id", { length: 64 }).notNull(),
+  purpose: varchar("purpose", { length: 64 }).notNull(), // data_processing | sms_reminders | volunteer_assist
+  text_version: varchar("text_version", { length: 32 }).notNull().default("v1.0"),
+  lang: varchar("lang", { length: 8 }).notNull().default("en"),
+  granted_at: timestamp("granted_at").defaultNow(),
+  withdrawn_at: timestamp("withdrawn_at"),
+});
+
+export const declarations = pgTable("declarations", {
+  id: serial("id").primaryKey(),
+  household_id: varchar("household_id", { length: 64 }).notNull(),
+  text_version: varchar("text_version", { length: 32 }).notNull().default("v1.0"),
+  lang: varchar("lang", { length: 8 }).notNull().default("en"),
+  accepted_at: timestamp("accepted_at").defaultNow(),
+});
+
+export const rejectionReasons = pgTable("rejection_reasons", {
+  code: varchar("code", { length: 64 }).primaryKey(),
+  text: jsonb("text").$type<{ en: string; hi?: string; mr?: string }>().notNull(),
+  mapped_attribute: varchar("mapped_attribute", { length: 128 }),
+});
+
+export const anonymizedDeletionLogs = pgTable("anonymized_deletion_logs", {
+  id: serial("id").primaryKey(),
+  household_deleted_at: timestamp("household_deleted_at").defaultNow(),
+  district_id: varchar("district_id", { length: 64 }),
+  member_count: integer("member_count").default(1),
+});
+
+export const reminders = pgTable("reminders", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  household_id: varchar("household_id", { length: 64 }).notNull(),
+  member_id: varchar("member_id", { length: 64 }),
+  type: varchar("type", { length: 64 }).notNull(),
+  priority: varchar("priority", { length: 32 }).notNull().default("MEDIUM"),
+  channel: varchar("channel", { length: 32 }).notNull().default("in_app"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  due_date: varchar("due_date", { length: 32 }),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const simulatedSmsMessages = pgTable("simulated_sms_messages", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  household_id: varchar("household_id", { length: 64 }),
+  phone: varchar("phone", { length: 32 }).notNull(),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 32 }).default("simulated_delivered"),
+  provider: varchar("provider", { length: 32 }).default("simulated"),
+  created_at: timestamp("created_at").defaultNow(),
+});
+
+export const users = pgTable("users", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  username: varchar("username", { length: 128 }).notNull().unique(),
+  password_hash: varchar("password_hash", { length: 255 }).notNull(),
+  full_name: varchar("full_name", { length: 255 }),
+  phone: varchar("phone", { length: 32 }),
+  email: varchar("email", { length: 128 }),
+  household_id: varchar("household_id", { length: 64 }).notNull(),
+  member_id: varchar("member_id", { length: 64 }).notNull(),
+  role: varchar("role", { length: 32 }).notNull().default("citizen"),
+  profile_completed: boolean("profile_completed").notNull().default(false),
+  digilocker_linked: boolean("digilocker_linked").notNull().default(false),
+  masked_aadhaar: varchar("masked_aadhaar", { length: 32 }),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
 });

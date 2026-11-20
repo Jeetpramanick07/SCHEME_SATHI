@@ -91,6 +91,7 @@ export class Evaluator {
     let matchedPathway: string | undefined;
 
     // 0. Hard filter evaluation (Age, Gender, Area Type, NMC Zone, District)
+    scheme.hard_filters = scheme.hard_filters || {};
     if (subject.age !== undefined) {
       if (scheme.hard_filters.min_age !== undefined && subject.age < scheme.hard_filters.min_age) {
         unmet.push({
@@ -223,7 +224,7 @@ export class Evaluator {
 
     // 1. Evaluate Exclusions
     let hasUnknownExclusion = false;
-    for (const exclusionNode of scheme.exclusion_rules) {
+    for (const exclusionNode of (scheme.exclusion_rules || [])) {
       const { result, unknown, variant } = this.evalExpression(exclusionNode, subject, context);
       if (variant) matchedVariant = variant;
       if (result === "TRUE") {
@@ -272,7 +273,7 @@ export class Evaluator {
     }
 
     // 2. Evaluate compiled rules
-    for (const rule of scheme.rules) {
+    for (const rule of (scheme.rules || [])) {
       if (rule.advisory_only) {
         advisories.push({ rule_id: rule.rule_id, note: rule.explanation || rule.attribute });
         continue;

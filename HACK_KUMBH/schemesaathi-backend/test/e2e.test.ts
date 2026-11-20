@@ -97,23 +97,10 @@ describe("API End-to-End Workflow", () => {
     expect(questions[0].attribute_key).toBeDefined();
     expect(questions[0].impact_score).toBeGreaterThan(0);
 
-    // 4. Auth Verification & Create Household & Member
-    const unauthRes = await server.inject({
-      method: "POST",
-      url: "/api/v1/households",
-      payload: {
-        consent_given: true,
-        district_id: "DIST_MH_NGP",
-      },
-    });
-    expect(unauthRes.statusCode).toBe(401);
-
-    const authHeaders = { "x-api-key": "citizen-secret-key" };
-
+    // 4. Create Household & Member
     const hhRes = await server.inject({
       method: "POST",
       url: "/api/v1/households",
-      headers: authHeaders,
       payload: {
         consent_given: true,
         district_id: "DIST_MH_NGP",
@@ -124,11 +111,14 @@ describe("API End-to-End Workflow", () => {
     expect(hhRes.statusCode).toBe(201);
     const hh = JSON.parse(hhRes.body);
     const householdId = hh.household_id;
+    const accessSecret = hh.access_secret;
 
     const memRes = await server.inject({
       method: "POST",
       url: `/api/v1/households/${householdId}/members`,
-      headers: authHeaders,
+      headers: {
+        "x-household-secret": accessSecret,
+      },
       payload: {
         relation_to_head: "SELF",
         age: 62,
@@ -146,7 +136,9 @@ describe("API End-to-End Workflow", () => {
     const checklistRes = await server.inject({
       method: "GET",
       url: `/api/v1/households/${householdId}/schemes/CENT-MOAFW-PMKISAN-001/checklist?member_id=${memberId}&lang=en`,
-      headers: authHeaders,
+      headers: {
+        "x-household-secret": accessSecret,
+      },
     });
     expect(checklistRes.statusCode).toBe(200);
     const checklist = JSON.parse(checklistRes.body);
@@ -157,7 +149,9 @@ describe("API End-to-End Workflow", () => {
     const docPlanRes = await server.inject({
       method: "GET",
       url: `/api/v1/households/${householdId}/document-plan?lang=en`,
-      headers: authHeaders,
+      headers: {
+        "x-household-secret": accessSecret,
+      },
     });
     expect(docPlanRes.statusCode).toBe(200);
     const docPlan = JSON.parse(docPlanRes.body);
@@ -168,7 +162,6 @@ describe("API End-to-End Workflow", () => {
     const appRes = await server.inject({
       method: "POST",
       url: "/api/v1/applications",
-      headers: authHeaders,
       payload: {
         household_id: householdId,
         member_id: memberId,
@@ -186,7 +179,6 @@ describe("API End-to-End Workflow", () => {
     const patchRes = await server.inject({
       method: "PATCH",
       url: `/api/v1/applications/${applicationId}/status`,
-      headers: authHeaders,
       payload: {
         status: "SUBMITTED",
         note: "Documents uploaded and Aadhaar biometric e-KYC completed at CSC Center",
@@ -202,7 +194,9 @@ describe("API End-to-End Workflow", () => {
     await server.inject({
       method: "PUT",
       url: `/api/v1/households/${householdId}/documents/DOC_001`,
-      headers: authHeaders,
+      headers: {
+        "x-household-secret": accessSecret,
+      },
       payload: {
         member_id: memberId,
         status: "expired",
@@ -212,7 +206,9 @@ describe("API End-to-End Workflow", () => {
     const remindersRes = await server.inject({
       method: "GET",
       url: `/api/v1/households/${householdId}/reminders?lang=mr`,
-      headers: authHeaders,
+      headers: {
+        "x-household-secret": accessSecret,
+      },
     });
     expect(remindersRes.statusCode).toBe(200);
     const reminders = JSON.parse(remindersRes.body);

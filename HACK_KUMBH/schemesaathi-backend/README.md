@@ -130,7 +130,129 @@ Where:
 
 ---
 
-## 7. How to Run
+## 7. Registration, Profile Flow & Provenance Model
+
+The backend supports an anonymous-first registration and profile flow where attribute fields are grouped into data-driven sections. Every value records where it came from, partial profiles return actionable tiered results, and identity quick-fills plug in cleanly behind ports.
+
+### Data Model & Entity Relationships
+
+```mermaid
+erDiagram
+    households ||--o{ household_members : "has"
+    households ||--o{ member_answers : "records"
+    households ||--o{ consent_records : "grants"
+    households ||--o{ declarations : "submits"
+    households ||--o{ applications : "files"
+    profile_sections ||--o{ profile_section_fields : "contains"
+    schemes ||--o{ applications : "targets"
+    rejection_reasons ||--o{ applications : "categorizes"
+
+    profile_sections {
+        string id PK
+        int order
+        string scope "household | member"
+        jsonb title
+        jsonb description
+        bool skippable
+    }
+
+    profile_section_fields {
+        int id PK
+        string section_id FK
+        string attribute_key
+        int order
+        int required_for_count
+        bool optional
+    }
+
+    member_answers {
+        int id PK
+        string household_id FK
+        string member_id
+        string attribute_key
+        jsonb value
+        string source "self_declared | chatbot_confirmed | digilocker | aadhaar_qr | volunteer_confirmed | document_verified"
+        string status "confirmed | proposed"
+        string updated_by_role "citizen | volunteer | chatbot"
+        timestamp updated_at
+    }
+
+    consent_records {
+        int id PK
+        string household_id FK
+        string purpose "data_processing | sms_reminders | volunteer_assist"
+        string text_version
+        string lang
+        timestamp granted_at
+        timestamp withdrawn_at
+    }
+
+    declarations {
+        int id PK
+        string household_id FK
+        string text_version
+        string lang
+        timestamp accepted_at
+    }
+```
+
+### Core Architecture Principles
+
+1. **Anonymous-First & Claim Flow**:
+   - Citizens can anonymously explore schemes via stateless `POST /api/v1/eligibility/evaluate`.
+   - When ready to save or apply, `POST /api/v1/households/claim` turns anonymous answers and consents into a persisted household profile.
+2. **Answer Provenance & Isolation**:
+   - Every answer records its `source` and `status` (`confirmed` | `proposed`).
+   - The eligibility engine reads only confirmed answers through one adapter. Proposed chatbot answers (`status='proposed'`) **never** alter eligibility until explicitly confirmed by the citizen via `POST /api/v1/households/:id/answers/confirm`.
+3. **Sensitive ID Protection & Privacy**:
+   - Government identity numbers (12-digit Aadhaar patterns `\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b`, PAN patterns `\b[A-Za-z]{5}\d{4}[A-Za-z]\b`) are strictly rejected with HTTP `422 Unprocessable Entity` (`SENSITIVE_ID_NOT_ALLOWED`).
+   - No ID numbers are ever stored.
+4. **Consistency Engine (Non-Blocking Warnings)**:
+   - Pure validator functions in `src/engine/consistency.ts` check logical mismatches (e.g., DOB vs age, BPL card with high income, married status with family size 1, widow marked as male).
+   - Warnings are returned as localized message keys and never block saving.
+5. **Truthful Wording & Right-to-be-Forgotten**:
+   - Notice and declaration texts state truthfully: (a) information is true to applicant's knowledge, (b) app only suggests schemes and does NOT verify documents, (c) government authorities verify original physical documents.
+   - Guard tests assert that no system text claims app verification or guaranteed benefits.
+   - `DELETE /api/v1/households/:id` triggers a cascade hard delete of all personal data, leaving only an anonymized audit row with zero PII.
+6. **Tiered Results & Pre-Trip Checks**:
+   - Results partitioned into `can_apply` (`status=ELIGIBLE`), `likely_confirm` (`status=UNKNOWN`), and `not_eligible`.
+   - The word "eligible" is strictly guarded and never output unless `can_apply` is true.
+   - Each scheme card returns `confidence_badge` (`high` | `medium` | `needs_confirmation`), statutory `disclaimer_keys`, and `pre_trip_check` with mandatory/alternative documents to bring to CSCs/tehsils.
+7. **Simulated Quick-Fill Ports**:
+   - `IdentityPrefill` and `DocumentVerifier` ports defined in `src/services/ports.ts`.
+   - Simulated DigiLocker and Aadhaar QR adapters enforce a strict whitelist returning **only** `age`, `gender`, and `district`. Full names, photos, raw QR bytes, and Aadhaar numbers are never returned.
+   - Real UIDAI / DigiLocker APIs are explicitly documented as out of scope for hackathon MVP.
+
+---
+
+## 8. Complete API Endpoint Reference
+
+| Method | Endpoint | Description | Auth / Role |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Health check, active schemes count, DB type | Public |
+| `GET` | `/api/v1/schemes` | Search & filter schemes (`q`, `category`, `district`, `source=cache\|db`) | Citizen / Volunteer |
+| `GET` | `/api/v1/schemes/:id` | Full scheme detail, compiled rules, tracking info | Citizen / Volunteer |
+| `POST` | `/api/v1/eligibility/evaluate` | Stateless 3-valued eligibility evaluation & tiered output | Citizen / Volunteer |
+| `POST` | `/api/v1/eligibility/next-questions` | Adaptive next-questions ranking by information gain | Citizen / Volunteer |
+| `GET` | `/api/v1/profile/sections` | Localized profile sections tree, fields, & `used_by_scheme_count` | Citizen / Volunteer |
+| `GET` | `/api/v1/households/:id/profile` | Save-and-resume household profile, completion %, provenance | Citizen / Volunteer |
+| `POST` | `/api/v1/households/claim` | Turn anonymous session answers into a persisted household | Citizen / Volunteer |
+| `PATCH` | `/api/v1/households/:id/answers` | Batch upsert answers with provenance (`self_declared`, `volunteer`) | Citizen / Volunteer |
+| `POST` | `/api/v1/households/:id/answers/proposed`| Store proposed answers from chatbot (`status=proposed`) | Citizen / Volunteer |
+| `POST` | `/api/v1/households/:id/answers/confirm` | Confirm/promote proposed answers with optional edits | Citizen / Volunteer |
+| `PATCH` | `/api/v1/consents/:id/withdraw` | Withdraw a previously granted citizen consent | Citizen / Volunteer |
+| `DELETE`| `/api/v1/households/:id` | Right to be forgotten (cascade hard delete of household & data)| Citizen / Volunteer |
+| `POST` | `/api/v1/prefill/digilocker/simulate` | Simulated DigiLocker quick-fill (whitelisted age, gender, district) | Citizen / Volunteer |
+| `POST` | `/api/v1/prefill/aadhaar-qr/simulate` | Simulated Aadhaar QR quick-fill (whitelisted age, gender, district) | Citizen / Volunteer |
+| `POST` | `/api/v1/applications` | Initialize application from scheme definition steps | Citizen / Volunteer |
+| `PATCH` | `/api/v1/applications/:id/outcome` | Record outcome (`approved`, `rejected`, `pending`, `withdrawn`) | Citizen / Volunteer |
+| `GET` | `/api/v1/admin/rejection-reasons` | Aggregate rejection causes & detect possible scheme rule divergence| Admin (`X-API-Key`) |
+| `GET` | `/api/v1/admin/pending-reviews` | List machine-drafted questions & translation placeholders | Admin (`X-API-Key`) |
+| `POST` | `/api/v1/admin/ingest` | Trigger scheme ingestion / reload (`dry_run=true\|false`) | Admin (`X-API-Key`) |
+
+---
+
+## 9. How to Run
 
 ```bash
 # 1. Install dependencies
@@ -139,21 +261,18 @@ pnpm install
 # 2. Run migrations
 pnpm migrate
 
-# 3. Seed database (curated question bank, 24 official schemes, prerequisites)
+# 3. Seed database (curated question bank, profile sections, rejection reasons, schemes)
 pnpm seed
 
 # 4. Start development server (OpenAPI Swagger at http://localhost:3000/docs)
 pnpm dev
 
-# 5. Run Vitest test suite
+# 5. Run complete Vitest test suite (9 test suites, 42 tests)
 pnpm test
 
-# 6. Run lint check
+# 6. Run lint check (0 errors, 0 warnings)
 pnpm lint
 
 # 7. Run scale benchmark (Cache vs Database search, 6-member household, next-questions)
 pnpm bench
-
-# 8. Run Audit Demo Proof (62yo widow persona, 24-scheme table, drop-in scheme)
-npx tsx scripts/demo-proof.ts
 ```
