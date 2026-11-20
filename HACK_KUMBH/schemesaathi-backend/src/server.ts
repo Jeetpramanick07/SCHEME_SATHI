@@ -134,6 +134,23 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Register Feature Modules under /api/v1
   await server.register(
     async (v1) => {
+      // GET /api/v1 - API Welcome & Index
+      v1.get("/", async () => {
+        return {
+          name: "SchemeSaathi API v1",
+          status: "online",
+          documentation: "/docs",
+          endpoints: {
+            meta: "/api/v1/meta",
+            schemes: "/api/v1/schemes",
+            facets: "/api/v1/schemes/facets",
+            evaluate: "/api/v1/eligibility/evaluate",
+            profile_sections: "/api/v1/profile/sections",
+            health: "/health",
+          },
+        };
+      });
+
       // GET /api/v1/meta: dataset version, synthetic flags, counts
       v1.get("/meta", async () => {
         let total = 0;
